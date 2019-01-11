@@ -47,7 +47,7 @@ General archive interface */
 
 static ds_ctxt_t *archive_init(const char *root);
 static ds_file_t *archive_open(ds_ctxt_t *ctxt, const char *path,
-			      MY_STAT *mystat);
+			      MY_STAT *mystat, bool rewrite);
 static int archive_write(ds_file_t *file, const void *buf, size_t len);
 static int archive_close(ds_file_t *file);
 static void archive_deinit(ds_ctxt_t *ctxt);
@@ -56,7 +56,10 @@ datasink_t datasink_archive = {
 	&archive_init,
 	&archive_open,
 	&archive_write,
+	nullptr,
 	&archive_close,
+	nullptr,
+	nullptr,
 	&archive_deinit
 };
 
@@ -149,8 +152,9 @@ err:
 
 static
 ds_file_t *
-archive_open(ds_ctxt_t *ctxt, const char *path, MY_STAT *mystat)
+archive_open(ds_ctxt_t *ctxt, const char *path, MY_STAT *mystat, bool rewrite)
 {
+  DBUG_ASSERT(rewrite == false);
 	ds_archive_ctxt_t	*archive_ctxt;
 	ds_ctxt_t		*dest_ctxt;
 	ds_file_t		*file;

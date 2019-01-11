@@ -67,7 +67,6 @@ unsigned long mysql_server_version = 0;
 
 /* server capabilities */
 bool have_changed_page_bitmaps = false;
-bool have_backup_locks = false;
 bool have_lock_wait_timeout = false;
 bool have_galera_enabled = false;
 bool have_flush_engine_logs = false;
@@ -333,7 +332,6 @@ bool get_mysql_vars(MYSQL *connection)
   char *version_var= NULL;
   char *version_comment_var= NULL;
   char *innodb_version_var= NULL;
-  char *have_backup_locks_var= NULL;
   char *log_bin_var= NULL;
   char *lock_wait_timeout_var= NULL;
   char *wsrep_on_var= NULL;
@@ -357,7 +355,6 @@ bool get_mysql_vars(MYSQL *connection)
   bool ret= true;
 
   mysql_variable mysql_vars[]= {
-      {"have_backup_locks", &have_backup_locks_var},
       {"log_bin", &log_bin_var},
       {"lock_wait_timeout", &lock_wait_timeout_var},
       {"gtid_mode", &gtid_mode_var},
@@ -382,11 +379,6 @@ bool get_mysql_vars(MYSQL *connection)
       {NULL, NULL}};
 
   read_mysql_variables(connection, "SHOW VARIABLES", mysql_vars, true);
-
-  if (have_backup_locks_var != NULL && !opt_no_backup_locks)
-  {
-    have_backup_locks= true;
-  }
 
   if (opt_binlog_info == BINLOG_INFO_AUTO)
   {
@@ -875,7 +867,8 @@ Function acquires either a backup tables lock, if supported
 by the server, or a global read lock (FLUSH TABLES WITH READ LOCK)
 otherwise.
 @returns true if lock acquired */
-bool lock_tables(MYSQL *connection)
+bool
+lock_for_backup_stage_start(MYSQL *connection)
 {
   if (have_lock_wait_timeout || opt_lock_wait_timeout)
   {
@@ -888,12 +881,6 @@ bool lock_tables(MYSQL *connection)
     xb_mysql_query(connection, buf, false);
   }
 
-  if (have_backup_locks)
-  {
-    msg("Executing LOCK TABLES FOR BACKUP...");
-    xb_mysql_query(connection, "LOCK TABLES FOR BACKUP", false);
-    return (true);
-  }
 
   if (opt_lock_wait_timeout)
   {
@@ -917,9 +904,6 @@ bool lock_tables(MYSQL *connection)
   }
 
   xb_mysql_query(connection, "BACKUP STAGE START", true);
-  // xb_mysql_query(connection, "BACKUP STAGE FLUSH", true);
-  // xb_mysql_query(connection, "BACKUP STAGE BLOCK_DDL", true);
-  xb_mysql_query(connection, "BACKUP STAGE BLOCK_COMMIT", true);
   /* Set the maximum supported session value for
   lock_wait_timeout to prevent unnecessary timeouts when the
   global value is changed from the default */
@@ -935,24 +919,66 @@ bool lock_tables(MYSQL *connection)
   return (true);
 }
 
-/*********************************************************************//**
-If backup locks are used, execute LOCK BINLOG FOR BACKUP provided that we are
-not in the --no-lock mode and the lock has not been acquired already.
-@returns true if lock acquired */
 bool
-lock_binlog_maybe(MYSQL *connection)
-{
-	if (have_backup_locks && !opt_no_lock && !binlog_locked) {
-		msg("Executing LOCK BINLOG FOR BACKUP...");
-		xb_mysql_query(connection, "LOCK BINLOG FOR BACKUP", false);
-		binlog_locked = true;
-
-		return(true);
+lock_for_backup_stage_flush(MYSQL *connection) {
+	if (opt_kill_long_queries_timeout) {
+		start_query_killer();
 	}
-
-	return(false);
+	xb_mysql_query(connection, "BACKUP STAGE FLUSH", true);
+	if (opt_kill_long_queries_timeout) {
+		stop_query_killer();
+	}
+	return true;
 }
 
+bool
+lock_for_backup_stage_block_ddl(MYSQL *connection) {
+	if (opt_kill_long_queries_timeout) {
+		start_query_killer();
+	}
+	xb_mysql_query(connection, "BACKUP STAGE BLOCK_DDL", true);
+	if (opt_kill_long_queries_timeout) {
+		stop_query_killer();
+	}
+	return true;
+}
+
+bool
+lock_for_backup_stage_commit(MYSQL *connection) {
+	if (opt_kill_long_queries_timeout) {
+		start_query_killer();
+	}
+	xb_mysql_query(connection, "BACKUP STAGE BLOCK_COMMIT", true);
+	if (opt_kill_long_queries_timeout) {
+		stop_query_killer();
+	}
+	return true;
+}
+
+bool backup_lock(MYSQL *con, const char *table_name) {
+	static const std::string backup_lock_prefix("BACKUP LOCK ");
+	std::string backup_lock_query = backup_lock_prefix + table_name;
+	xb_mysql_query(con, backup_lock_query.c_str(), true);
+	return true;
+}
+
+bool backup_unlock(MYSQL *con) {
+	xb_mysql_query(con, "BACKUP UNLOCK", true);
+	return true;
+}
+
+std::unordered_set<std::string>
+get_tables_in_use(MYSQL *con) {
+	std::unordered_set<std::string> result;
+	MYSQL_RES *q_res =
+		xb_mysql_query(con, "SHOW OPEN TABLES WHERE In_use = 1", true);
+	while (MYSQL_ROW row = mysql_fetch_row(q_res)) {
+		auto tk = table_key(row[0], row[1]);
+		msg("Table %s is in use", tk.c_str());
+		result.insert(std::move(tk));
+	}
+	return result;
+}
 
 /*********************************************************************//**
 Releases either global read lock acquired with FTWRL and the binlog
@@ -1177,15 +1203,6 @@ write_galera_info(MYSQL *connection)
 		{NULL, NULL}
 	};
 
-	/* When backup locks are supported by the server, we should skip
-	creating xtrabackup_galera_info file on the backup stage, because
-	wsrep_local_state_uuid and wsrep_last_committed will be inconsistent
-	without blocking commits. The state file will be created on the prepare
-	stage using the WSREP recovery procedure. */
-	if (have_backup_locks) {
-		return(true);
-	}
-
 	read_mysql_variables(connection, "SHOW STATUS", status, true);
 
 	if ((state_uuid == NULL && state_uuid55 == NULL)
@@ -1244,8 +1261,6 @@ write_current_binlog_file(MYSQL *connection)
 
 	if (gtid_exists) {
 		size_t log_bin_dir_length;
-
-		lock_binlog_maybe(connection);
 
 		xb_mysql_query(connection, "FLUSH BINARY LOGS", false);
 
@@ -1748,4 +1763,24 @@ mdl_unlock_all()
   xb_mysql_query(mdl_con, "COMMIT", false, true);
   mysql_close(mdl_con);
   spaceid_to_tablename.clear();
+}
+
+ulonglong get_current_lsn(MYSQL *connection)
+{
+	static const char lsn_prefix[] = "\nLog sequence number ";
+	ulonglong lsn = 0;
+	if (MYSQL_RES *res = xb_mysql_query(connection,
+					    "SHOW ENGINE INNODB STATUS",
+					    true, false)) {
+		if (MYSQL_ROW row = mysql_fetch_row(res)) {
+			const char *p= strstr(row[2], lsn_prefix);
+			DBUG_ASSERT(p);
+			if (p) {
+				p += sizeof lsn_prefix - 1;
+				lsn = lsn_t(strtoll(p, NULL, 10));
+			}
+		}
+		mysql_free_result(res);
+	}
+	return lsn;
 }

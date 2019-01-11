@@ -65,7 +65,6 @@ typedef enum enum_control_file_error {
   CONTROL_FILE_UNKNOWN_ERROR /* any other error */
 } CONTROL_FILE_ERROR;
 
-
 CONTROL_FILE_ERROR ma_control_file_open(my_bool create_if_missing,
                                         my_bool print_error,
                                         my_bool wait_for_lock);

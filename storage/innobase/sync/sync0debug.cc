@@ -33,6 +33,7 @@ Created 2012-08-21 Sunny Bains
 #include "sync0sync.h"
 #include "sync0debug.h"
 #include "srv0start.h"
+#include "srv0srv.h"
 #include "fil0fil.h"
 
 #include <vector>

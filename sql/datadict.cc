@@ -20,7 +20,7 @@
 #include "sql_table.h"
 #include "ha_sequence.h"
 
-static int read_string(File file, uchar**to, size_t length)
+int read_string(File file, uchar**to, size_t length)
 {
   DBUG_ENTER("read_string");
 

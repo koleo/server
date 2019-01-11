@@ -1160,7 +1160,8 @@ typedef struct { const char *dli_fname, dli_fbase; } Dl_info;
 #define WT_RWLOCKS_USE_MUTEXES 1
 #endif
 
-#if !defined(__cplusplus) && !defined(bool)
+/* Avoid 'bool' redefinition on windows */
+#if !defined(__cplusplus) && !defined(__WIN__) && !defined(bool)
 #define bool In_C_you_should_use_my_bool_instead()
 #endif
 

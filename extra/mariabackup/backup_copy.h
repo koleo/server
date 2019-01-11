@@ -2,6 +2,7 @@
 #ifndef XTRABACKUP_BACKUP_COPY_H
 #define XTRABACKUP_BACKUP_COPY_H
 
+#include <functional>
 #include <my_global.h>
 #include "datasink.h"
 
@@ -29,10 +30,11 @@ bool
 copy_file(ds_ctxt_t *datasink,
 	  const char *src_file_path,
 	  const char *dst_file_path,
-	  uint thread_n);
+	  uint thread_n,
+		bool rewrite = false);
 
 /** Start --backup */
-bool backup_start();
+bool backup_files(const char *from);
 /** Release resources after backup_start() */
 void backup_release();
 /** Finish after backup_start() and backup_release() */
@@ -47,5 +49,22 @@ bool
 is_path_separator(char);
 bool
 directory_exists(const char *dir, bool create);
-
+bool has_rocksdb_plugin();
+void rocksdb_create_checkpoint();
+void foreach_file_in_db_dirs(
+	const char *dir_path, std::function<bool(const char *)> func);
+void foreach_file_in_datadir(
+	const char *dir_path, std::function<bool(const char *)> func);
+bool ends_with(const char *str, const char *suffix);
+bool starts_with(const char *str, const char *prefix);
+void parse_db_table_from_file_path(
+	const char *filepath, char *dbname, char *tablename);
+const char *trim_dotslash(const char *path);
+bool backup_files_from_datadir(const char *dir_path);
+bool is_system_table(const char *dbname, const char *tablename);
+std::unique_ptr<std::vector<std::string>>
+	find_files(const char *dir_path, const char *prefix, const char *suffix);
+bool file_exists(const char *filename);
+bool
+filename_matches(const char *filename, const char **ext_list);
 #endif

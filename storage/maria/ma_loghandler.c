@@ -1096,12 +1096,9 @@ static TRANSLOG_FILE *get_current_logfile()
   DBUG_RETURN(file);
 }
 
-uchar	maria_trans_file_magic[]=
+uchar	maria_trans_file_magic[LOG_MAGIC_SIZE]=
 { (uchar) 254, (uchar) 254, (uchar) 11, '\001', 'M', 'A', 'R', 'I', 'A',
  'L', 'O', 'G' };
-#define LOG_HEADER_DATA_SIZE (sizeof(maria_trans_file_magic) + \
-                              8 + 4 + 4 + 4 + 2 + 3 + \
-                              LSN_STORE_SIZE)
 
 
 /*

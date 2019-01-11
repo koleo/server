@@ -49,4 +49,5 @@ static inline bool dd_frm_is_view(THD *thd, char *path)
 
 bool dd_recreate_table(THD *thd, const char *db, const char *table_name);
 
+int read_string(File file, uchar**to, size_t length);
 #endif // DATADICT_INCLUDED

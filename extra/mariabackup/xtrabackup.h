@@ -25,6 +25,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1335  USA
 #include "datasink.h"
 #include "xbstream.h"
 #include "changed_page_bitmap.h"
+#include "handler.h"
+
+#include <utility>
+#include <vector>
+#include <tuple>
+#include <functional>
+
 
 struct xb_delta_info_t
 {
@@ -83,7 +90,7 @@ extern my_bool		xtrabackup_decrypt_decompress;
 extern char		*innobase_data_file_path;
 extern longlong		innobase_page_size;
 
-extern int		xtrabackup_parallel;
+extern uint		xtrabackup_parallel;
 
 extern my_bool		xb_close_files;
 extern const char	*xtrabackup_compress_alg;
@@ -102,7 +109,6 @@ extern my_bool		opt_galera_info;
 extern my_bool		opt_slave_info;
 extern my_bool		opt_no_lock;
 extern my_bool		opt_safe_slave_backup;
-extern my_bool		opt_rsync;
 extern my_bool		opt_force_non_empty_dirs;
 extern my_bool		opt_noversioncheck;
 extern my_bool		opt_no_backup_locks;
@@ -205,4 +211,41 @@ typedef void (*insert_entry_func_t)(const char*);
 void xb_load_list_string(char *list, const char *delimiters,
                          insert_entry_func_t ins);
 void register_ignore_db_dirs_filter(const char *name);
+
+const char *convert_dst(const char *dst);
+
+std::string get_table_version_from_image(const std::vector<uchar> &frm_image);
+std::pair<bool, legacy_db_type>
+	get_table_engine_from_image(const std::vector<uchar> &frm_image);
+std::string read_table_version_id(File file);
+
+std::string convert_tablename_to_filepath(
+	const char *data_dir_path, const std::string &db, const std::string &table);
+
+std::tuple<std::string, std::string, std::string>
+convert_filepath_to_tablename(const char *filepath);
+
+typedef std::string table_key_t;
+
+inline table_key_t table_key(const std::string &db, const std::string &table) {
+	return std::string(db).append(".").append(table);
+};
+
+inline table_key_t table_key(const char *db, const char *table) {
+	return std::string(db).append(".").append(table);
+};
+
+typedef std::function<void(std::string, std::string, std::string)>
+  post_copy_table_hook_t;
+
+my_bool
+check_if_skip_table(
+/******************/
+	const char*	name);	/*!< in: path to the table */
+
+bool is_log_table(const char *dbname, const char *tablename);
+bool is_stats_table(const char *dbname, const char *tablename);
+
+extern my_bool xtrabackup_copy_back;
+extern my_bool xtrabackup_move_back;
 #endif /* XB_XTRABACKUP_H */
