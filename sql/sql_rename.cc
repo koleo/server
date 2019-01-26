@@ -280,6 +280,7 @@ do_rename(THD *thd, TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
   int rc= 1;
   handlerton *hton, *new_hton;
   LEX_CSTRING old_alias, new_alias;
+  LEX_CUSTRING old_version;
   DBUG_ENTER("do_rename");
   DBUG_PRINT("enter", ("skip_error: %d  if_exists: %d", (int) skip_error,
                        (int) if_exists));
@@ -296,7 +297,9 @@ do_rename(THD *thd, TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
   }
   DBUG_ASSERT(new_alias.str);
 
-  if (!ha_table_exists(thd, &ren_table->db, &old_alias, &hton) || !hton)
+  if (!ha_table_exists(thd, &ren_table->db, &old_alias, &old_version, NULL,
+                       &hton) ||
+      !hton)
   {
     my_error(ER_NO_SUCH_TABLE, MYF((skip_error | if_exists) ? ME_NOTE : 0),
              ren_table->db.str, old_alias.str);
@@ -314,7 +317,7 @@ do_rename(THD *thd, TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
     DBUG_RETURN(0);
   }
 
-  if (ha_table_exists(thd, new_db, &new_alias, &new_hton))
+  if (ha_table_exists(thd, new_db, &new_alias, NULL, NULL, &new_hton))
   {
     my_error(ER_TABLE_EXISTS_ERROR, MYF(0), new_alias.str);
     DBUG_RETURN(1);                     // This can't be skipped
@@ -337,7 +340,7 @@ do_rename(THD *thd, TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
 
     thd->replication_flags= 0;
     if (!(rc= mysql_rename_table(hton, &ren_table->db, &old_alias,
-                                 new_db, &new_alias, 0)))
+                                 new_db, &new_alias, &old_version, 0)))
     {
       (void) rename_table_in_stat_tables(thd, &ren_table->db,
                                          &ren_table->table_name,
@@ -354,8 +357,8 @@ do_rename(THD *thd, TABLE_LIST *ren_table, const LEX_CSTRING *new_db,
           triggers appropriately. So let us revert operations on .frm
           and handler's data and report about failure to rename table.
         */
-        (void) mysql_rename_table(hton, new_db, &new_alias,
-                                  &ren_table->db, &old_alias, NO_FK_CHECKS);
+        (void) mysql_rename_table(hton, new_db, &new_alias, &ren_table->db,
+                                  &old_alias, &old_version, NO_FK_CHECKS);
       }
     }
     if (thd->replication_flags & OPTION_IF_EXISTS)
