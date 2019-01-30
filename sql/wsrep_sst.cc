@@ -300,7 +300,7 @@ bool wsrep_sst_donor_update (sys_var *self, THD* thd, enum_var_type type)
 }
 
 
-bool wsrep_before_SE()
+bool wsrep_SST_before_SE()
 {
   return (wsrep_provider != NULL
           && strcmp (wsrep_provider,   WSREP_NONE)
@@ -352,8 +352,9 @@ void wsrep_sst_received (THD*                thd,
     wsrep::gtid const sst_gtid(wsrep::id(uuid.data, sizeof(uuid.data)),
                                wsrep::seqno(seqno));
 
-    if (!wsrep_before_SE()) {
-      wsrep_set_SE_checkpoint(wsrep::gtid::undefined(), wsrep_gtid_server.undefined());
+    if (!wsrep_SST_before_SE()) {
+      wsrep_set_SE_checkpoint(wsrep::gtid::undefined(),
+                              wsrep_gtid_server.undefined());
       wsrep_set_SE_checkpoint(sst_gtid, wsrep_gtid_server.gtid());
     }
     wsrep_verify_SE_checkpoint(uuid, seqno);

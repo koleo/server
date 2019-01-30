@@ -669,6 +669,8 @@ int ha_initialize_handlerton(st_plugin_int *plugin)
 
   DBUG_EXECUTE_IF("unstable_db_type", {
                     static int i= (int) DB_TYPE_FIRST_DYNAMIC;
+                    while (installed_htons[i])
+                      i++;
                     hton->db_type= (enum legacy_db_type)++i;
                   });
 
