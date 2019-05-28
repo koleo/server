@@ -1,0 +1,104 @@
+
+
+
+
+
+
+  # Clean install test
+
+
+
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download ES 10.2'
+    inputs:
+      source: 'specific'
+      project: '550599d3-6165-4abd-8c86-e3f7e53a1847'
+      artifact: '$(shortName)-rpm'
+      pipeline: 3
+      runVersion: 'latestFromBranch'
+      runBranch: 'refs/heads/10.2-enterprise'
+      downloadPath: '$(Build.ArtifactStagingDirectory)/10.2-enterprise'
+
+  - task: DownloadPipelineArtifact@2
+    displayName: 'Download ES 10.3'
+    inputs:
+      source: 'specific'
+      project: '550599d3-6165-4abd-8c86-e3f7e53a1847'
+      artifact: '$(shortName)-rpm'
+      pipeline: 3
+      runVersion: 'latestFromBranch'
+      runBranch: 'refs/heads/10.3-enterprise'
+      downloadPath: '$(Build.ArtifactStagingDirectory)/10.3-enterprise'
+
+  - template: azure/prepare-vm-for-installation.yml
+
+  - bash: |
+      set -x
+      ls -la '$(System.ArtifactsDirectory)'
+      sudo yum -y --nogpgcheck install '$(System.ArtifactsDirectory)/10.2-enterprise/$(shortName)-RPMS'/*.rpm
+    displayName: 'Install 10.2 version'
+
+  - template: azure/select-insert-test.yml
+  - template: azure/run-acceptance-tests.yml
+
+  - bash: |
+      set -x
+      if [ -e /etc/init.d/mysql ] ; then
+        stop_cmd="sudo /etc/init.d/mysql stop"
+      else
+        stop_cmd="sudo systemctl stop mariadb"
+      fi
+
+      # Stop server before upgrade
+      [[ -n $(pidof mysqld) ]] && eval $stop_cmd
+      RES=$?
+      if [[ ${RES:-} -gt 0 ]]; then
+        echo "mysqld es-10.2 failed to stop!"
+        exit 1
+      fi
+  - bash: |
+      set -x
+      ls -la '$(System.ArtifactsDirectory)'
+      sudo yum -y --nogpgcheck install '$(System.ArtifactsDirectory)/10.3-enterprise/$(shortName)-RPMS'/*.rpm
+    displayName: 'Install 10.3 version'
+
+  - template: azure/select-insert-test.yml
+  - template: azure/run-acceptance-tests.yml
+
+  - bash: |
+      set -x
+      if [ -e /etc/init.d/mysql ] ; then
+        stop_cmd="sudo /etc/init.d/mysql stop"
+      else
+        stop_cmd="sudo systemctl stop mariadb"
+      fi
+
+      # Stop server before upgrade
+      [[ -n $(pidof mysqld) ]] && eval $stop_cmd
+      RES=$?
+      if [[ ${RES:-} -gt 0 ]]; then
+        echo "mysqld es-10.3 failed to stop!"
+        exit 1
+      fi
+  - bash: |
+      set -x
+      ls -la '$(System.ArtifactsDirectory)'
+      sudo yum -y --nogpgcheck install '$(System.ArtifactsDirectory)/current/$(shortName)-RPMS'/*.rpm
+    displayName: 'Install current 10.4 version'
+
+  - template: azure/select-insert-test.yml
+  - template: azure/run-acceptance-tests.yml
+
+  - bash: |
+      rm -fr $(Build.ArtifactStagingDirectory)/10.*-enterprise
+    displayName: "Clean downloaded packages"
+
+  # Upload log with failed tests to the same directory
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: $(shortName)-RPMS
+
+
+  # done? upgrade from ES 10.2 to ES 10.3 to ES 10.4 should be tested,
+  # then also from community server to enterprise server

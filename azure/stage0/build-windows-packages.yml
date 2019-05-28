@@ -1,0 +1,84 @@
+parameters:
+  BuildType: ''
+  Artifact:  ''
+
+jobs:
+
+- job: BuildWindowsPackages_${{ parameters.BuildType }}
+  timeoutInMinutes: 180
+  dependsOn: BuildSourceTarball
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'windows-2019'
+
+  steps:
+
+  - checkout: none
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: 'current'
+      specificBuildWithTriggering: true
+      downloadType: 'single'
+      artifactName: source
+      downloadPath: '$(System.ArtifactsDirectory)'
+
+  - powershell: |
+      Invoke-WebRequest -Uri https://cygwin.com/setup-x86_64.exe -OutFile setup-x86_64.exe
+      .\setup-x86_64.exe --no-admin --packages "bison,tar" -q -R C:\cygwin64 -s http://cygwin.mirror.constant.com -a x86_64 -v
+    displayName: 'Install cygwin packages'
+    failOnStderr: false
+    ignoreLASTEXITCODE: true
+
+  - task: ExtractFiles@1
+    inputs:
+      archiveFilePatterns: '$(System.ArtifactsDirectory)/source/mariadb-*.tar.gz'
+      cleanDestinationFolder: false
+    displayName: 'Extract sources'
+
+
+  - powershell: |
+      Set-PSDebug -Trace 1
+      dir
+      move mariadb-*/* $(Build.SourcesDirectory)
+      md win_build
+      cd win_build
+      cmake .. -Wno-deprecated -Wno-dev -DBUILD_CONFIG=enterprise `
+        -DPLUGIN_AWS_KEY_MANAGEMENT=NO -DBISON_EXECUTABLE=C:\cygwin64\bin\bison `
+        -DWITH_EMBEDDED_SERVER=0 -DSIGNCODE=OFF -DWITH_UNIT_TESTS=0 -DMYSQL_MAINTAINER_MODE=ERR
+    displayName: 'CMake configure'
+    failOnStderr: false
+
+  - script: |
+      @echo on
+      pwd
+      cd win_build
+      cmake --build . --config ${{ parameters.BuildType }} --verbose --parallel 5
+    displayName: 'Compile Windows binaries - ${{ parameters.BuildType }}'
+
+  - script: |
+      @echo on
+      pwd
+      cd win_build
+      cmake --build . --config ${{ parameters.BuildType }} --target win_package
+      cmake --build . --config ${{ parameters.BuildType }} --target MSI
+    displayName: 'Build Windows packages'
+
+  - task: CopyFiles@2
+    inputs:
+      sourceFolder: '$(Build.SourcesDirectory)\win_build'
+      contents: '?(*.msi|*.zip)'
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: Windows-${{ parameters.Artifact }}
+
+  - script: |
+      @echo on
+      cd win_build\mysql-test
+      C:\Strawberry\perl\bin\perl.exe mysql-test-run.pl ^
+        --suite=main,innodb,mariabackup,rocksdb,plugins --force --retry=3 ^
+        --max-save-core=1 --max-save-datadir=1 --max-test-fail=20  --parallel=5
+    displayName: 'Windows MTR ${{ parameters.BuildType }} tests'

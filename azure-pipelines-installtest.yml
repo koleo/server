@@ -1,0 +1,127 @@
+# C/C++ with GCC
+# Build your C/C++ project with GCC using make.
+# Add steps that publish test results, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/apps/c-cpp/gcc
+
+variables:
+  MYSQL_PASSWORD: 'tESt123%_password'
+  ESTOKEN: '49bc85f8-6e90-443d-901a-b7f01a4ab22c'
+  ES_REPO_URL: 'https://dlm.mariadb.com/enterprise-release-helpers/mariadb_es_repo_setup'
+  VERSION: '10.4'
+
+jobs:
+
+- job: Install_ES_10_2
+  timeoutInMinutes: 30
+  workspace:
+    clean: all
+  strategy:
+    maxParallel: 2
+    matrix:
+      rhel-6:
+        poolName: 'rhel-6'
+      rhel-7:
+        poolName: 'rhel-7'
+      # rhel-8:
+      #   poolName: 'rhel-8'
+      debian-8:
+        poolName: 'debian-8'
+      debian-9:
+        poolName: 'debian-9'
+      debian-10:
+        poolName: 'debian-10'
+      ubuntu-1604:
+        poolName: 'ubuntu-1604'
+      ubuntu-1804:
+        poolName: 'ubuntu-1804'
+  pool:
+    name: $(poolName)
+
+  steps:
+  - checkout: none
+  - template: azure/prepare-vm-for-installation.yml
+
+  - bash: |
+      set -ex
+      wget $(ES_REPO_URL) -O install_mariadb.sh
+      chmod +x ./install_mariadb.sh
+      sudo ./install_mariadb.sh --token=$(ESTOKEN) --apply --verbose --mariadb-server-version=$(VERSION)
+    displayName: "Install ES-$(VERSION) repo file and key"
+
+  - bash: |
+      set -ex
+      sudo yum -y install MariaDB-*
+    displayName: "Install ES-$(VERSION) on RHEL/Centos"
+    condition: and(succeeded(), in(variables['poolName'], 'rhel-6', 'rhel-7', 'rhel-8'))
+
+  - bash: |
+      set -ex
+      sudo apt-get update
+      export DEBIAN_FRONTEND=noninteractive
+      sudo apt-get -y install mariadb-server mariadb-backup \
+      mariadb-plugin-mroonga mariadb-plugin-oqgraph mariadb-plugin-rocksdb mariadb-plugin-spider \
+      mariadb-test mariadb-test-data
+      # we do not install cassandra and tokudb (doesn't exist in ES)
+    displayName: "Install ES-$(VERSION) on Debian/Ubuntu"
+    condition: and(succeeded(), in(variables['poolName'], 'debian-8', 'debian-9', 'debian-10', 'ubuntu-1604', 'ubuntu-1804'))
+
+  - bash: |
+      set -ex
+      if [[ -f /etc/init.d/mysql ]]; then
+        restart_cmd="service mysql restart"
+      else
+        restart_cmd="systemctl restart mysql"
+      fi
+      sudo ${restart_cmd}
+    displayName: "Restart ES-$(VERSION) NOT RHEL-7"
+    condition: ne(variables['poolName'], 'rhel-7')
+
+  - bash: |
+      set -x
+      restart_cmd="systemctl restart mariadb"
+      sudo ${restart_cmd}
+    displayName: "Restart ES-$(VERSION) RHEL-7"
+    condition: eq(variables['poolName'], 'rhel-7')
+
+  - bash: |
+      set -ex
+      sudo mysql -e 'SELECT 1'
+    displayName: "Check ES-$(VERSION) installation on RHEL/Centos"
+    condition: and(succeeded(), in(variables['poolName'], 'rhel-6', 'rhel-7', 'rhel-8'))
+
+  - bash: |
+      set -ex
+      sudo mysql -p$(MYSQL_PASSWORD) -e 'SELECT 1'
+    displayName: "Check ES-$(VERSION) installation on Debian/Ubuntu"
+    condition: in(variables['poolName'], 'debian-8', 'debian-9', 'debian-10', 'ubuntu-1604', 'ubuntu-1804')
+
+  - bash: |
+      set -x
+      rpm -qa | grep -iE "^maria|^mysql|^percona|^galera"
+    displayName: "List installed MariaDB packages on RHEL/Centos"
+    condition: and(succeeded(), in(variables['poolName'], 'rhel-6', 'rhel-7', 'rhel-8'))
+
+  - bash: |
+      set -x
+      dpkg -l | grep -iE "maria|mysql|percona|galera" | awk '{print $1"\t"$2"\t"$3"\t"$4}'
+    displayName: "List installed MariaDB packages on Debian/Ubuntu"
+    condition: and(succeeded(), in(variables['poolName'], 'debian-8', 'debian-9', 'debian-10', 'ubuntu-1604', 'ubuntu-1804'))
+
+  - template: azure/prepare-vm-for-installation.yml
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

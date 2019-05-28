@@ -1,0 +1,111 @@
+
+jobs:
+
+- job: BuildRPMs
+  timeoutInMinutes: 180
+  dependsOn: BuildSourceTarball
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-16.04'
+  strategy:
+    matrix:
+      rhel-6:
+        containerImage: rhel-6
+      rhel-7:
+        containerImage: rhel-7
+      rhel-8:
+        containerImage: rhel-8
+      sles-12:
+        containerImage: sles-12
+      sles-15:
+        containerImage: sles-15
+
+  container: $[variables['containerImage']]
+
+  steps:
+
+  - checkout: none
+  - template: extract-source-tarball.yml
+
+
+  - bash: |
+      set -x
+      cd "${BUILDDIR}"
+      curl -o ../MariaDB-shared-5.3.x.rpm  \
+        http://yum.mariadb.org/5.3/centos5-amd64/rpms/MariaDB-shared-5.3.12-122.el5.x86_64.rpm
+      curl -o ../MariaDB-shared-10.1.x.rpm \
+        http://yum.mariadb.org/10.1/centos6-amd64/rpms/MariaDB-10.1.41-centos6-x86_64-shared.rpm
+    displayName: 'Fetch Compat RPMs for for RHEL-6'
+    condition: eq(variables['containerImage'], 'rhel-6')
+
+  - bash: |
+      set -x
+      cd "${BUILDDIR}"
+      curl -o ../MariaDB-shared-5.3.x.rpm  \
+        http://yum.mariadb.org/5.3/centos5-amd64/rpms/MariaDB-shared-5.3.12-122.el5.x86_64.rpm
+      curl -o ../MariaDB-shared-10.1.x.rpm \
+        http://yum.mariadb.org/10.1/centos7-amd64/rpms/MariaDB-shared-10.1.41-1.el7.centos.x86_64.rpm
+    displayName: 'Fetch Compat RPMs for RHEL-7'
+    condition: eq(variables['containerImage'], 'rhel-7')
+
+  - bash: |
+      set -x
+      cd "${BUILDDIR}"
+      curl -o ../MariaDB-shared-5.3.x.rpm  \
+        http://yum.mariadb.org/5.3/centos5-amd64/rpms/MariaDB-shared-5.3.12-122.el5.x86_64.rpm
+      curl -o ../MariaDB-shared-10.1.x.rpm \
+        http://yum.mariadb.org/10.1/sles12-amd64/rpms/MariaDB-shared-10.1.41-1.x86_64.rpm
+    displayName: 'Fetch Compat RPMs for SLES 12 & 15'
+    condition: in(variables['containerImage'], 'sles-12', 'sles-15')
+
+  - bash: |
+      set -x
+      cd "${BUILDDIR}"
+      PLATFORM=$(containerImage)
+      cmake . -DCMAKE_C_COMPILER=/opt/rh/devtoolset-3/root/usr/bin/gcc \
+        -DCMAKE_CXX_COMPILER=/opt/rh/devtoolset-3/root/usr/bin/g++ \
+        -DRPM=${PLATFORM/-/} -DBUILD_CONFIG=enterprise
+    displayName: 'CMake configure RPM RHEL 6'
+    condition: eq(variables['containerImage'], 'rhel-6')
+
+  - bash: |
+      set -x
+      cd "${BUILDDIR}"
+      PLATFORM=$(containerImage)
+      cmake . -DRPM=${PLATFORM/-/} -DBUILD_CONFIG=enterprise
+    displayName: 'CMake configure RPM'
+    condition: ne(variables['containerImage'], 'rhel-6')
+
+  - bash: |
+      set -x
+      cd "${BUILDDIR}"
+      make -j`grep -c processor /proc/cpuinfo` package VERBOSE=1
+    displayName: 'Build RPM package'
+
+  - bash: |
+      set -x
+      cd "${BUILDDIR}"
+      pwd
+      find . -type f -name "*.rpm"
+      ls -la
+      echo '$(Build.SourcesDirectory)'
+      echo '$(Build.ArtifactStagingDirectory)'
+    condition: succeeded()
+
+  - bash: |
+      set -x
+      find -L . -type l -print -delete
+    displayName: 'Workaround for CopyFiles'
+
+  - task: CopyFiles@2
+    inputs:
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
+      sourceFolder: '$(BUILDDIR)'
+      contents: '?(*.rpm)'
+    condition: succeeded()
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: $(containerImage)-RPMS

@@ -1,0 +1,66 @@
+
+jobs:
+
+- job: BuildDEBs
+  timeoutInMinutes: 180
+  dependsOn: BuildSourceTarball
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-16.04'
+  strategy:
+    matrix:
+      ubuntu-1604:
+        containerImage: ubuntu-1604
+      ubuntu-1804:
+        containerImage: ubuntu-1804
+      ubuntu-2004:
+        containerImage: ubuntu-2004
+      debian-9:
+        containerImage: debian-9
+      debian-10:
+        containerImage: debian-10
+  container: $[variables['containerImage']]
+
+  steps:
+
+  - checkout: none
+  - template: extract-source-tarball.yml
+  - script: |
+      set -x
+      cd ${BUILDDIR}
+      sed s/"dch -b"/"dch -b --force-distribution"/g -i debian/autobake-deb.sh
+    condition: eq(variables['containerImage'], 'debian-8')
+    displayName: 'Fix for Debian 8'
+
+  - script: |
+      set -x
+      cd ${BUILDDIR}
+      debian/autobake-deb.sh
+    condition: eq( variables['Agent.OS'], 'Linux' )
+    displayName: 'Build packages'
+
+  - script: |
+      set -x
+      cd ${BUILDDIR}
+      pwd
+      mkdir -vp $BUILD_ARTIFACTSTAGINGDIRECTORY/binary
+      mkdir -vp $BUILD_ARTIFACTSTAGINGDIRECTORY/source
+      ls -lah ..
+      echo $BUILD_SOURCESDIRECTORY
+      echo $BUILD_ARTIFACTSTAGINGDIRECTORY
+      cp -v ../*.deb $BUILD_ARTIFACTSTAGINGDIRECTORY/binary/
+      cp -v ../*.changes $BUILD_ARTIFACTSTAGINGDIRECTORY/binary/
+      cp -v ../*.ddeb $BUILD_ARTIFACTSTAGINGDIRECTORY/binary/
+      cp -v ../*.buildinfo $BUILD_ARTIFACTSTAGINGDIRECTORY/binary/
+      cp -v ../*.xz $BUILD_ARTIFACTSTAGINGDIRECTORY/binary/
+      cp -v ../*.dsc $BUILD_ARTIFACTSTAGINGDIRECTORY/binary/
+      cd $BUILD_ARTIFACTSTAGINGDIRECTORY
+      dpkg-scanpackages binary /dev/null | gzip -9c > binary/Packages.gz
+      dpkg-scansources source /dev/null | gzip -9c > source/Sources.gz
+    displayName: 'Create repo structure'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: $(containerImage)-DEBS

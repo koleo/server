@@ -1,0 +1,48 @@
+parameters:
+  BuildType: ''
+  CMakeArgs: ''
+  Artifact:  ''
+
+jobs:
+
+- job: BuildMacPackages_${{ parameters.Artifact }}
+  dependsOn: BuildSourceTarball
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'macOS-latest'
+
+  steps:
+
+  - checkout: none
+  - template: extract-source-tarball.yml
+
+  - script: |
+      brew install jemalloc mhash curl gnutls
+    displayName: "brew install dependencies"
+
+  - script: |
+      cd ${BUILDDIR}
+      cmake . -DCMAKE_BUILD_TYPE=${{ parameters.BuildType }} \
+        -DWITH_SSL=/usr/local/opt/openssl@1.1 -DBUILD_CONFIG=enterprise
+    displayName: 'cmake configure'
+    failOnStderr: false
+
+  - script: |
+      cd ${BUILDDIR}
+      make -j5 package
+    displayName: 'make'
+    failOnStderr: false
+
+#   #- script: cd support-files/macOSpkg && ./mkpkg ../../mariadb*tar.gz && mv -vi *.pkg ../../
+
+  - task: CopyFiles@2
+    inputs:
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
+      sourceFolder: "$(BUILDDIR)"
+      contents: '*.tar.gz'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: 'macOS-latest-${{ parameters.Artifact }}'

@@ -1,0 +1,39 @@
+
+jobs:
+
+- job: BuildSourceTarball
+  pool:
+    vmImage: 'ubuntu-16.04'
+  strategy:
+    matrix:
+      ubuntu-1804:
+        containerImage: ubuntu-1804
+  container: $[variables['containerImage']]
+
+  steps:
+
+  - checkout: self
+
+  - bash: |
+      set -x
+      whoami
+      pwd
+
+      # remove xpand
+      git config -f .git/config --remove-section submodule.storage/xpand ||:
+      git config -f .gitmodules --remove-section submodule.storage/xpand ||:
+      git add .gitmodules
+      git rm -fr --cached storage/xpand ||:
+      rm -rf storage/xpand
+      rm -rf .git/modules/storage/xpand
+
+      mkdir dist && cd dist
+      cmake .. -DBUILD_CONFIG=enterprise
+      make dist
+      cp *.tar.gz $BUILD_ARTIFACTSTAGINGDIRECTORY
+    displayName: Build Source Tarball
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: source

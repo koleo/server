@@ -1,0 +1,52 @@
+parameters:
+  MtrArgs: ''
+  TestName: 'MTR Test'
+  tarname: ''
+  Artifact: Release
+
+steps:
+
+  - bash: |
+      set -x
+      cd $(Build.SourcesDirectory)
+      [[ -d bin ]] && export PATH="$(Build.SourcesDirectory)/bin:${PATH}"
+
+      WSREP_PROVIDER=$(sudo find /usr -type f -name 'libgalera_enterprise_smm.so')
+      if [[ -n ${WSREP_PROVIDER} ]]; then
+        export WSREP_PROVIDER
+        sudo mysqld --help --verbose 2>&1 | grep wsrep
+      fi
+
+      if [[ -d mysql-test ]]; then
+        MYSQLTEST=$(Build.SourcesDirectory)/mysql-test
+      else
+        MYSQLTEST=$(find /usr/share -type d -name 'mysql-test' ||:)
+      fi
+
+      if [[ -z "${MYSQLTEST}" ]]; then
+        echo "- mysql-test directory doesn't exist after PKG installation!"
+        exit 1
+      else
+        sudo chown -R ${USER} "${MYSQLTEST}"
+      fi
+
+      cd "${MYSQLTEST}"
+      exec perl mysql-test-run.pl ${{ parameters.MtrArgs }}
+
+    displayName: "MTR - ${{ parameters.TestName }}"
+    condition: succeededOrFailed()
+
+  - bash: |
+      set -x
+      ls -la '$(Build.ArtifactStagingDirectory)'
+      rm -frv '$(Build.ArtifactStagingDirectory)'/*
+      mkdir -p '$(Build.ArtifactStagingDirectory)'/MTR-Results
+      tar czvf '$(Build.ArtifactStagingDirectory)'/MTR-Results/${{ parameters.tarname }} $(MYSQL_VARDIR)/*
+    displayName: 'Archive mysql vardir'
+    condition: failed()
+
+  - task: PublishBuildArtifacts@1
+    condition: failed()
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: '$(containerImage)-${{ parameters.Artifact }}'

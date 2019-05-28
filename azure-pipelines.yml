@@ -1,0 +1,164 @@
+# C/C++ with GCC
+# Build your C/C++ project with GCC using make.
+# Add steps that publish test results, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/apps/c-cpp/gcc
+
+resources:
+    containers:
+
+    - container: rhel-6
+      image: mariadbe.azurecr.io/build-es:rhel-6
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: rhel-7
+      image: mariadbe.azurecr.io/build-es:rhel-7
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: rhel-8
+      image: mariadbe.azurecr.io/build-es:rhel-8
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: sles-12
+      image: mariadbe.azurecr.io/build-es:sles-12
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: sles-15
+      image: mariadbe.azurecr.io/build-es:sles-15
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: ubuntu-1604
+      image: mariadbe.azurecr.io/build-es:ubuntu-1604
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: ubuntu-1804
+      image: mariadbe.azurecr.io/build-es:ubuntu-1804
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: ubuntu-2004
+      image: mariadbe.azurecr.io/build-es:ubuntu-2004
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: debian-8
+      image: mariadbe.azurecr.io/build-es:debian-8
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: debian-9
+      image: mariadbe.azurecr.io/build-es:debian-9
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: debian-10
+      image: mariadbe.azurecr.io/build-es:debian-10
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+variables:
+  configuration: RelWithDebInfo
+  platform: x64
+  TEST_RESULTS_FILE: 'test-results.log'
+  MTR_FEEDBACK_PLUGIN: 1
+  DEBIAN_FRONTEND: noninteractive
+  MYSQL_VARDIR: '/var/tmp/mtr'
+  DEB_LOCAL_LIST: '/etc/apt/sources.list.d/localInstall.list'
+  BUILDDIR: "$(Build.SourcesDirectory)/padding_for_CPACK_RPM_BUILD_SOURCE_DIRS_PREFIX_ON_ES_BACKUP_DEBUGSOURCE"
+#
+stages:
+
+- stage: BuildPackages_Stage0
+
+  jobs:
+
+  - template: azure/stage0/build-source-tarball.yml
+  - template: azure/stage0/build-windows-packages.yml
+    parameters:
+      Artifact: Release
+      BuildType: RelWithDebInfo
+
+  - template: azure/stage0/build-macos-packages.yml
+    parameters:
+      Artifact: Release
+      BuildType: RelWithDebInfo
+
+#################################
+########## STAGE 0 END ##########
+#################################
+
+
+#################################
+######### STAGE 1 BEGIN #########
+#################################
+
+- stage: TestPackages_Stage1
+  dependsOn: BuildPackages_Stage0
+  condition: succeededOrFailed()
+
+  jobs:
+  - job: TestMacOSBinaries
+    pool:
+      vmImage: 'macOS-latest'
+
+    steps:
+    - checkout: none
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        specificBuildWithTriggering: true
+        downloadType: 'single'
+        artifactName: macOS-latest-Release
+        downloadPath: '$(System.ArtifactsDirectory)'
+
+    - bash: |
+        tar xzf '$(System.ArtifactsDirectory)'/macOS-latest-Release/mariadb-*.tar.gz \
+          --strip-components=1 -C $(Build.SourcesDirectory)
+      displayName: "Unpack MacOS bintar"
+
+    - template: azure/tests/mac-mtr-test.yml
+      parameters:
+        Artifact: Release
+        TestName: 'NORMAL'
+        tarname: 'macOS-normal.tar.gz'
+        MtrArgs: '--verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --parallel=auto --vardir=$(MYSQL_VARDIR)'
+
+
+  - job: TestMSI_Quick
+    timeoutInMinutes: 10
+    pool:
+      vmImage: 'windows-2019'
+
+    steps:
+
+    - checkout: none
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        specificBuildWithTriggering: true
+        downloadType: 'single'
+        artifactName: Windows-Release
+        downloadPath: '$(System.ArtifactsDirectory)'
+
+    - powershell: |
+        Set-PSDebug -Trace 1
+        $MSI=(Get-Childitem -Path $(System.ArtifactsDirectory)\Windows-Release -Filter *.msi).fullname
+        Start-Process msiexec.exe -Wait -ArgumentList "/I $MSI PASSWORD=tESt123%_password SERVICENAME=MariaDB-Enterprise /qn /l*v .\msi-install-log.txt"
+
+        $ProgramFilesPath = [Environment]::GetEnvironmentVariable("ProgramW6432")
+        Get-Childitem -Path $ProgramFilesPath -Recurse -Filter mysql.exe
+
+        Get-Content -Path .\msi-install-log.txt
+      displayName: "Install Windows MSI package"
+
+    - template: azure/tests/win-select-insert.yml
+#
+#################################
+########## STAGE 1 END ##########
+#################################
+#

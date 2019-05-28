@@ -1,0 +1,58 @@
+parameters:
+  BuildType: ''
+  CMakeArgs: ''
+  Artifact:  ''
+
+jobs:
+
+- job: BuildTarballs_${{ parameters.Artifact }}_${{ parameters.BuildType }}
+  timeoutInMinutes: 180
+  dependsOn: BuildSourceTarball
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-16.04'
+  strategy:
+    matrix:
+      ubuntu-1904:
+        containerImage: ubuntu-2004
+  container: $[variables['containerImage']]
+
+  steps:
+
+  - checkout: none
+  - template: extract-source-tarball.yml
+
+  - bash: |
+      set -x
+      df -h
+      ls -la
+      pwd
+      cd ${BUILDDIR}
+      mkdir build
+
+  - bash: |
+      set -x
+      cd ${BUILDDIR}/build
+      CC=gcc-10 CXX=g++-10 cmake .. -DBUILD_CONFIG=enterprise \
+        -DCMAKE_BUILD_TYPE=${{ parameters.BuildType }} \
+        -DMYSQL_MAINTAINER_MODE=OFF ${{ parameters.CMakeArgs }}
+    displayName: 'CMake configure ${{ parameters.BuildType }} ${{ parameters.CMakeArgs }}'
+
+  - bash: |
+      set -x
+      cd ${BUILDDIR}/build
+      make -j`grep -c processor /proc/cpuinfo` package VERBOSE=1
+    displayName: 'Build ${{ parameters.BuildType }} ${{ parameters.CMakeArgs }} Tarball'
+
+  - task: CopyFiles@2
+    timeoutInMinutes: 2
+    inputs:
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
+      sourceFolder: "$(BUILDDIR)/build"
+      contents: '?(*.tar.gz)'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: '$(containerImage)-${{ parameters.Artifact }}-${{ parameters.BuildType }}'

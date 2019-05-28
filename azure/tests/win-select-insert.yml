@@ -1,0 +1,47 @@
+steps:
+
+- powershell: |
+    Set-PSDebug -Trace 1
+    $password_option="-pS1mpl-pw"
+    $install_password="-ptESt123%_password"
+    $ProgramFilesPath = [Environment]::GetEnvironmentVariable("ProgramW6432")
+    $mysql = Get-Childitem -Path $ProgramFilesPath -Recurse -Filter mysql.exe
+
+    & $mysql -uroot $install_password -e 'drop database if exists test;'
+    & $mysql -uroot $install_password -e 'create database test;'
+    & $mysql -uroot $install_password -e 'create table test.t(a int primary key) engine=innodb;'
+    & $mysql -uroot $install_password -e 'insert into test.t values (1);'
+    & $mysql -uroot $install_password -e 'select * from test.t;'
+    & $mysql -uroot $install_password -e 'drop table test.t;'
+
+    & $mysql -uroot $install_password -e "set password=PASSWORD('S1mpl-pw')"
+
+    & $mysql -uroot $password_option -e "CREATE DATABASE db"
+    & $mysql -uroot $password_option -e "CREATE TABLE db.t_innodb(a1 SERIAL, c1 CHAR(8)) ENGINE=InnoDB; INSERT INTO db.t_innodb VALUES (1,'foo'),(2,'bar')"
+    & $mysql -uroot $password_option -e "CREATE TABLE db.t_myisam(a2 SERIAL, c2 CHAR(8)) ENGINE=MyISAM; INSERT INTO db.t_myisam VALUES (1,'foo'),(2,'bar')"
+    & $mysql -uroot $password_option -e "CREATE TABLE db.t_aria(a3 SERIAL, c3 CHAR(8)) ENGINE=Aria; INSERT INTO db.t_aria VALUES (1,'foo'),(2,'bar')"
+    & $mysql -uroot $password_option -e "CREATE TABLE db.t_memory(a4 SERIAL, c4 CHAR(8)) ENGINE=MEMORY; INSERT INTO db.t_memory VALUES (1,'foo'),(2,'bar')"
+    & $mysql -uroot $password_option -e "CREATE ALGORITHM=MERGE VIEW db.v_merge AS SELECT * FROM db.t_innodb, db.t_myisam, db.t_aria"
+    & $mysql -uroot $password_option -e "CREATE ALGORITHM=TEMPTABLE VIEW db.v_temptable AS SELECT * FROM db.t_innodb, db.t_myisam, db.t_aria"
+    & $mysql -uroot $password_option -e "CREATE PROCEDURE db.p() SELECT * FROM db.v_merge"
+    & $mysql -uroot $password_option -e "CREATE FUNCTION db.f() RETURNS INT DETERMINISTIC RETURN 1"
+  displayName: "Windows SELECT/INSERT tests"
+  failOnStderr: false
+  errorActionPreference: continue
+
+
+- powershell: |
+    Set-PSDebug -Trace 1
+    $password_option="-pS1mpl-pw"
+    $ProgramFilesPath = [Environment]::GetEnvironmentVariable("ProgramW6432")
+    $mysql = Get-Childitem -Path $ProgramFilesPath -Recurse -Filter mysql.exe
+
+    $UNSTABLE = & $mysql -uroot $password_option -e "SELECT PLUGIN_NAME, PLUGIN_MATURITY, PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_MATURITY != 'Stable' AND PLUGIN_STATUS != 'DISABLED';"
+    if ($UNSTABLE) {
+      Write-Host "- Plugins maturity test failed"
+      [Environment]::Exit(1)
+    }
+  displayName: "Windows plugins maturity test"
+  failOnStderr: false
+  errorActionPreference: continue
+

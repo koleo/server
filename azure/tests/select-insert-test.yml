@@ -1,0 +1,61 @@
+steps:
+
+  - bash: |
+      set -x
+      INSTALLED=""
+
+      if [[ -e /etc/redhat-release ]]; then
+        INSTALLED=$(rpm -qa | grep -iE "^maria|^mysql|^percona|^galera" ||:)
+      fi
+
+      if [[ -e /etc/debian_version ]]; then
+        INSTALLED=$(dpkg -l | grep -iE "^maria|^mysql|^percona|^galera" ||:)
+      fi
+
+      [[ -n "${INSTALLED}" ]] && echo "${INSTALLED}"
+
+      if [ -e /etc/init.d/mysql ] ; then
+        restart_cmd="/etc/init.d/mysql restart"
+        status_cmd="/etc/init.d/mysql status"
+      else
+        systemctl --version
+        sudo systemctl show mariadb | grep Capa || true
+        restart_cmd="systemctl restart mariadb"
+        status_cmd="systemctl status mariadb"
+      fi
+
+      sudo ${restart_cmd}
+      sudo ${status_cmd}
+
+      MYSQL_PID=$(pidof mysqld)
+      if [[ -z "${MYSQL_PID}" ]]; then
+        echo "- Probably MySQL failed to start!"
+        exit 1
+      fi
+    displayName: "Restart MySQL after installation"
+    failOnStderr: false
+
+  - bash: |
+      set -x
+
+      sudo mysql -e 'drop database if exists test;'
+      sudo mysql -e 'create database test;'
+      sudo mysql -e 'create table test.t(a int primary key) engine=innodb;'
+      sudo mysql -e 'insert into test.t values (1);'
+      sudo mysql -e 'select * from test.t;'
+      sudo mysql -e 'drop table test.t;'
+
+      sudo mysql -e "set password= PASSWORD('S1mpl-pw')"
+      password_option="-pS1mpl-pw"
+
+      sudo mysql -uroot $password_option -e "CREATE DATABASE db"
+      sudo mysql -uroot $password_option -e "CREATE TABLE db.t_innodb(a1 SERIAL, c1 CHAR(8)) ENGINE=InnoDB; INSERT INTO db.t_innodb VALUES (1,'foo'),(2,'bar')"
+      sudo mysql -uroot $password_option -e "CREATE TABLE db.t_myisam(a2 SERIAL, c2 CHAR(8)) ENGINE=MyISAM; INSERT INTO db.t_myisam VALUES (1,'foo'),(2,'bar')"
+      sudo mysql -uroot $password_option -e "CREATE TABLE db.t_aria(a3 SERIAL, c3 CHAR(8)) ENGINE=Aria; INSERT INTO db.t_aria VALUES (1,'foo'),(2,'bar')"
+      sudo mysql -uroot $password_option -e "CREATE TABLE db.t_memory(a4 SERIAL, c4 CHAR(8)) ENGINE=MEMORY; INSERT INTO db.t_memory VALUES (1,'foo'),(2,'bar')"
+      sudo mysql -uroot $password_option -e "CREATE ALGORITHM=MERGE VIEW db.v_merge AS SELECT * FROM db.t_innodb, db.t_myisam, db.t_aria"
+      sudo mysql -uroot $password_option -e "CREATE ALGORITHM=TEMPTABLE VIEW db.v_temptable AS SELECT * FROM db.t_innodb, db.t_myisam, db.t_aria"
+      sudo mysql -uroot $password_option -e "CREATE PROCEDURE db.p() SELECT * FROM db.v_merge"
+      sudo mysql -uroot $password_option -e "CREATE FUNCTION db.f() RETURNS INT DETERMINISTIC RETURN 1"
+
+    displayName: "Simple SELECT/INSERT tests"

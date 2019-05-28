@@ -1,0 +1,212 @@
+# C/C++ with GCC
+# Build your C/C++ project with GCC using make.
+# Add steps that publish test results, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/apps/c-cpp/gcc
+
+resources:
+    containers:
+
+    - container: rhel-6
+      image: mariadbe.azurecr.io/build-es:rhel-6
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: rhel-7
+      image: mariadbe.azurecr.io/build-es:rhel-7
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: rhel-8
+      image: mariadbe.azurecr.io/build-es:rhel-8
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: sles-12
+      image: mariadbe.azurecr.io/build-es:sles-12
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: sles-15
+      image: mariadbe.azurecr.io/build-es:sles-15
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: ubuntu-1604
+      image: mariadbe.azurecr.io/build-es:ubuntu-1604
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: ubuntu-1804
+      image: mariadbe.azurecr.io/build-es:ubuntu-1804
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: debian-8
+      image: mariadbe.azurecr.io/build-es:debian-8
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: debian-9
+      image: mariadbe.azurecr.io/build-es:debian-9
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: debian-10
+      image: mariadbe.azurecr.io/build-es:debian-10
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+variables:
+  TEST_RESULTS_FILE: 'test-results.log'
+  MTR_FEEDBACK_PLUGIN: 1
+  DEBIAN_FRONTEND: noninteractive
+  MYSQL_VARDIR: '/var/tmp/mtr'
+  BUILDDIR: "$(Build.SourcesDirectory)/BUILD"
+  VERSION: '10.3'
+
+stages:
+- stage: BuildPackages_Stage0
+  jobs:
+  - template: azure/stage0/build-source-tarball.yml
+  - template: azure/stage0/build-binary-tarballs.yml
+    parameters:
+      BuildType: RelWithDebInfo
+      Artifact: Release
+
+#################################
+######### STAGE 2 BEGIN #########
+#################################
+#
+# Run install test for RPM/DEB packages
+
+#
+# Checks if binary packages are OK on all supported platforms
+# Checks if functionality is OK
+# Checks if replication is OK
+#
+- stage: TestPackages_Stage2
+  dependsOn: BuildPackages_Stage0
+  condition: succeededOrFailed()
+
+  jobs:
+
+  - job: TestTarball_2
+    timeoutInMinutes: 600
+
+    workspace:
+      clean: all
+    pool:
+      vmImage: 'ubuntu-16.04'
+    strategy:
+      matrix:
+        rhel-6:
+          containerImage: rhel-6
+        rhel-7:
+          containerImage: rhel-7
+        rhel-8:
+          containerImage: rhel-8
+        sles-12:
+          containerImage: sles-12
+        sles-15:
+          containerImage: sles-15
+        debian-8:
+          containerImage: debian-8
+        debian-9:
+          containerImage: debian-9
+        debian-10:
+          containerImage: debian-10
+        ubuntu-1604:
+          containerImage: ubuntu-1604
+        ubuntu-1804:
+          containerImage: ubuntu-1804
+    container: $[variables['containerImage']]
+
+    steps:
+
+    - checkout: none
+    - template: azure/install-galera.yml
+    - template: azure/fetch-unpack-tarball.yml
+
+    - template: azure/tests/run-mtr-test.yml
+      parameters:
+        MtrArgs: '--force --retry=3 --max-save-core=1 --vardir=${MYSQL_VARDIR} --max-save-datadir=1 --max-test-fail=20 --big-test --parallel=auto'
+        TestName: 'MTR -big test'
+        tarname: 'mtr-big-test.tar.gz'
+        Artifact: Release
+
+    - template: azure/tests/run-mtr-test.yml
+      parameters:
+        MtrArgs: '--force --parallel=auto --suite=galera,wsrep --max-test-fail=0 --testcase-timeout=120 --vardir=$(MYSQL_VARDIR) --big-test'
+        TestName: 'MTR Galera -big test'
+        tarname: 'mtr-galera-big-test.tar.gz'
+        Artifact: Release
+
+
+- stage: TestPackages_Stage3
+  dependsOn: BuildPackages_Stage0
+  condition: succeededOrFailed()
+
+  jobs:
+
+  - job: TestTarball_3
+    timeoutInMinutes: 600
+
+    workspace:
+      clean: all
+    pool:
+      vmImage: 'ubuntu-16.04'
+    strategy:
+      matrix:
+        rhel-6:
+          containerImage: rhel-6
+        rhel-7:
+          containerImage: rhel-7
+        rhel-8:
+          containerImage: rhel-8
+        sles-12:
+          containerImage: sles-12
+        sles-15:
+          containerImage: sles-15
+        debian-8:
+          containerImage: debian-8
+        debian-9:
+          containerImage: debian-9
+        ubuntu-1604:
+          containerImage: ubuntu-1604
+        ubuntu-1804:
+          containerImage: ubuntu-1804
+    container: $[variables['containerImage']]
+
+    steps:
+
+    - checkout: none
+    - template: azure/fetch-unpack-tarball.yml
+
+    - template: azure/tests/run-mtr-test.yml
+      parameters:
+        MtrArgs: '--verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --parallel=auto --vardir=$(MYSQL_VARDIR)'
+        TestName: 'MTR Normal test'
+        tarname: 'mtr-normal-test.tar.gz'
+        Artifact: Release
+
+    - template: azure/tests/run-mtr-test.yml
+      parameters:
+        MtrArgs: '--verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --parallel=auto --ps-protocol --vardir=$(MYSQL_VARDIR)'
+        TestName: 'MTR PS Protocol test'
+        tarname: 'mtr-ps-protocol-test.tar.gz'
+        Artifact: Release
+
+    - template: azure/tests/run-mtr-test.yml
+      parameters:
+        MtrArgs: '--verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --parallel=auto --suite=funcs_1,funcs_2,stress,jp --testcase-timeout=120 --mysqld=--open-files-limit=0 --mysqld=--log-warnings=1 --vardir=$(MYSQL_VARDIR)'
+        TestName: 'MTR Extra test'
+        tarname: 'mtr-extra-test.tar.gz'
+        Artifact: Release
+
+    - template: azure/tests/run-mtr-test.yml
+      parameters:
+        MtrArgs: '--verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --parallel=auto --suite=spider,spider/bg,engines/funcs,engines/iuds --testcase-timeout=120 --mysqld=--open-files-limit=0 --mysqld=--log-warnings=1 --vardir=$(MYSQL_VARDIR)'
+        TestName: 'MTR Engines test'
+        tarname: 'mtr-engines-test.tar.gz'
+        Artifact: Release
+

@@ -1,0 +1,89 @@
+parameters:
+  BuildType: ''
+  CMakeArgs: ''
+  Artifact:  ''
+
+jobs:
+
+- job: BuildTarballs_${{ parameters.Artifact }}
+  timeoutInMinutes: 180
+  dependsOn: BuildSourceTarball
+  workspace:
+    clean: all
+  pool:
+    vmImage: 'ubuntu-16.04'
+  strategy:
+    matrix:
+      ubuntu-1604:
+        containerImage: ubuntu-1604
+      ubuntu-1804:
+        containerImage: ubuntu-1804
+      ubuntu-2004:
+        containerImage: ubuntu-2004
+      debian-9:
+        containerImage: debian-9
+      debian-10:
+        containerImage: debian-10
+      rhel-6:
+        containerImage: rhel-6
+      rhel-7:
+        containerImage: rhel-7
+      rhel-8:
+        containerImage: rhel-8
+      sles-12:
+        containerImage: sles-12
+      sles-15:
+        containerImage: sles-15
+
+  container: $[variables['containerImage']]
+
+  steps:
+
+  - checkout: none
+  - template: extract-source-tarball.yml
+
+  - bash: |
+      set -x
+      df -h
+      ls -la
+      pwd
+      cd ${BUILDDIR}
+      mkdir build
+
+  - bash: |
+      cd ${BUILDDIR}/build
+      cmake .. \
+        -DCMAKE_C_COMPILER=/opt/rh/devtoolset-3/root/usr/bin/gcc \
+        -DCMAKE_CXX_COMPILER=/opt/rh/devtoolset-3/root/usr/bin/g++ \
+        -DBUILD_CONFIG=enterprise -DCMAKE_BUILD_TYPE=${{ parameters.BuildType }} \
+        -DMYSQL_MAINTAINER_MODE=OFF ${{ parameters.CMakeArgs }}
+    displayName: 'CMake configure ${{ parameters.BuildType }} ${{ parameters.CMakeArgs }} rhel-6'
+    condition: eq(variables['containerImage'], 'rhel-6')
+
+  - bash: |
+      set -x
+      cd ${BUILDDIR}/build
+      cmake .. \
+        -DBUILD_CONFIG=enterprise \
+        -DCMAKE_BUILD_TYPE=${{ parameters.BuildType }} \
+        -DMYSQL_MAINTAINER_MODE=OFF ${{ parameters.CMakeArgs }}
+    displayName: 'CMake configure ${{ parameters.BuildType }} ${{ parameters.CMakeArgs }}'
+    condition: ne(variables['containerImage'], 'rhel-6')
+
+  - bash: |
+      set -x
+      cd ${BUILDDIR}/build
+      make -j`grep -c processor /proc/cpuinfo` package VERBOSE=1
+    displayName: 'Build ${{ parameters.BuildType }} ${{ parameters.CMakeArgs }} Tarball'
+
+  - task: CopyFiles@2
+    timeoutInMinutes: 2
+    inputs:
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
+      sourceFolder: "$(BUILDDIR)/build"
+      contents: '?(*.tar.gz)'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: '$(containerImage)-${{ parameters.Artifact }}'

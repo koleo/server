@@ -1,0 +1,113 @@
+# C/C++ with GCC
+# Build your C/C++ project with GCC using make.
+# Add steps that publish test results, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/apps/c-cpp/gcc
+
+resources:
+    containers:
+    - container: ubuntu-1804
+      image: mariadbe.azurecr.io/build-es:ubuntu-1804
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: ubuntu-1904
+      image: mariadbe.azurecr.io/build-es:ubuntu-1904
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+variables:
+  TEST_RESULTS_FILE: 'test-results.log'
+  MTR_FEEDBACK_PLUGIN: 1
+  DEBIAN_FRONTEND: noninteractive
+  MYSQL_VARDIR: '/var/tmp/mtr'
+  BUILDDIR: "$(Build.SourcesDirectory)/BUILD"
+  ASAN_OPTIONS: abort_on_error=1
+#
+stages:
+
+- stage: BuildPackages_Stage0
+
+  jobs:
+
+  - template: azure/stage0/build-source-tarball.yml
+
+  - template: azure/stage0/build-binary-tarballs-asan.yml
+    parameters:
+      BuildType: RelWithDebInfo
+      Artifact: ASAN
+      CMakeArgs: '-DWITH_ASAN=ON'
+
+  - template: azure/stage0/build-binary-tarballs-asan.yml
+    parameters:
+      BuildType: Debug
+      Artifact: ASAN
+      CMakeArgs: '-DWITH_ASAN=ON'
+
+#################################
+########## STAGE 0 END ##########
+#################################
+
+
+#################################
+######### STAGE 1 BEGIN #########
+#################################
+
+- stage: TestPackages_ASAN
+  dependsOn: BuildPackages_Stage0
+  condition: succeededOrFailed()
+  jobs:
+
+  - job: TestTarball_Debug
+    timeoutInMinutes: 240
+    workspace:
+      clean: all
+    pool:
+      vmImage: 'ubuntu-16.04'
+    strategy:
+      matrix:
+        ubuntu-1904:
+          containerImage: ubuntu-1904
+    container: $[variables['containerImage']]
+
+    steps:
+
+    - checkout: none
+    - template: azure/fetch-unpack-tarball.yml
+      parameters:
+        Artifact: ASAN-Debug
+    - template: azure/tests/run-mtr-test.yml
+      parameters:
+        MtrArgs: '--force --verbose-restart --parallel=auto --vardir=$(MYSQL_VARDIR)'
+        TestName: 'Quick MTR Test - ASAN Debug'
+        tarname: 'asan-mtr-quick-test.tar.gz'
+        Artifact: ASAN-Debug
+
+  - job: TestTarball_RelWithDebInfo
+    timeoutInMinutes: 240
+    workspace:
+      clean: all
+    pool:
+      vmImage: 'ubuntu-16.04'
+    strategy:
+      matrix:
+        ubuntu-1904:
+          containerImage: ubuntu-1904
+    container: $[variables['containerImage']]
+
+    steps:
+
+    - checkout: none
+    - template: azure/fetch-unpack-tarball.yml
+      parameters:
+        Artifact: ASAN-RelWithDebInfo
+    - template: azure/tests/run-mtr-test.yml
+      parameters:
+        MtrArgs: '--force --verbose-restart --parallel=auto --vardir=$(MYSQL_VARDIR)'
+        TestName: 'Quick MTR Test - ASAN RelWithDebInfo'
+        tarname: 'asan-mtr-quick-test.tar.gz'
+        Artifact: ASAN-RelWithDebInfo
+#
+#################################
+########## STAGE 1 END ##########
+#################################
+#

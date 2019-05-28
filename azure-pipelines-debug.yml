@@ -1,0 +1,133 @@
+# C/C++ with GCC
+# Build your C/C++ project with GCC using make.
+# Add steps that publish test results, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/apps/c-cpp/gcc
+
+resources:
+    containers:
+
+    - container: rhel-6
+      image: mariadbe.azurecr.io/build-es:rhel-6
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: rhel-7
+      image: mariadbe.azurecr.io/build-es:rhel-7
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: rhel-8
+      image: mariadbe.azurecr.io/build-es:rhel-8
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: sles-12
+      image: mariadbe.azurecr.io/build-es:sles-12
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: sles-15
+      image: mariadbe.azurecr.io/build-es:sles-15
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: ubuntu-1604
+      image: mariadbe.azurecr.io/build-es:ubuntu-1604
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: ubuntu-1804
+      image: mariadbe.azurecr.io/build-es:ubuntu-1804
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: debian-8
+      image: mariadbe.azurecr.io/build-es:debian-8
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: debian-9
+      image: mariadbe.azurecr.io/build-es:debian-9
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+    - container: debian-10
+      image: mariadbe.azurecr.io/build-es:debian-10
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+variables:
+  TEST_RESULTS_FILE: 'test-results.log'
+  MTR_FEEDBACK_PLUGIN: 1
+  DEBIAN_FRONTEND: noninteractive
+  MYSQL_VARDIR: '/var/tmp/mtr'
+  BUILDDIR: "$(Build.SourcesDirectory)/BUILD"
+  VERSION: '10.4'
+#
+stages:
+
+- stage: BuildPackages_Stage0
+
+  jobs:
+
+  - template: azure/stage0/build-source-tarball.yml
+
+  - template: azure/stage0/build-binary-tarballs.yml
+    parameters:
+      BuildType: Debug
+      Artifact: Debug
+
+  - template: azure/stage0/build-windows-packages.yml
+    parameters:
+      Artifact: Debug
+      BuildType: Debug
+
+  - template: azure/stage0/build-macos-packages.yml
+    parameters:
+      BuildType: Debug
+      Artifact: Debug
+
+#################################
+########## STAGE 0 END ##########
+#################################
+
+
+#################################
+######### STAGE 1 BEGIN #########
+#################################
+
+- stage: TestPackages_Debug
+  dependsOn: BuildPackages_Stage0
+  condition: succeededOrFailed()
+  jobs:
+
+  - job: TestTarball_Quick
+    timeoutInMinutes: 240
+    workspace:
+      clean: all
+    pool:
+      vmImage: 'ubuntu-16.04'
+    strategy:
+      matrix:
+        rhel-7:
+          containerImage: rhel-7
+        ubuntu-1804:
+          containerImage: ubuntu-1804
+    container: $[variables['containerImage']]
+
+    steps:
+
+    - checkout: none
+    - template: azure/fetch-unpack-tarball.yml
+      parameters:
+        Artifact: Debug
+    - template: azure/tests/run-mtr-test.yml
+      parameters:
+        MtrArgs: '--mem --force --verbose-restart --skip-test-list=unstable-tests --parallel=auto'
+        TestName: 'Quick Test - Debug'
+
+#
+#################################
+########## STAGE 1 END ##########
+#################################
+#

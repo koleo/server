@@ -1,0 +1,24 @@
+
+parameters:
+  Artifact: Release
+
+steps:
+
+- task: DownloadBuildArtifacts@0
+  inputs:
+    buildType: 'current'
+    specificBuildWithTriggering: true
+    downloadType: 'single'
+    artifactName: '$(containerImage)-${{ parameters.Artifact }}'
+    downloadPath: '$(System.ArtifactsDirectory)'
+
+- bash: |
+    df -h
+    ls -la
+    pwd
+    mkdir test
+    tar xzf '$(System.ArtifactsDirectory)'/$(containerImage)-${{ parameters.Artifact }}/mariadb-*.tar.gz \
+      --strip-components=1 -C $(Build.SourcesDirectory)
+    ls -la
+    rm -frv '$(System.ArtifactsDirectory)'/$(containerImage)-${{ parameters.Artifact }}/mariadb-*.tar.gz
+  displayName: "Unpack ${{ parameters.Artifact }} Tarball"

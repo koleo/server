@@ -1,0 +1,65 @@
+steps:
+
+  - bash: |
+      set -x
+      sudo mysql -e "CREATE USER IF NOT EXISTS 'testuser'@'localhost' IDENTIFIED BY '$(MYSQL_PASSWORD)';"
+      UNSTABLE=$(mysql -utestuser -p'$(MYSQL_PASSWORD)' -E -e "SELECT PLUGIN_NAME, PLUGIN_MATURITY, PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_MATURITY != 'Stable' AND PLUGIN_STATUS != 'DISABLED';")
+      if [[ -n "${UNSTABLE}" ]]; then
+        echo "- Plugins maturity test failed"
+        echo "${UNSTABLE}"
+      fi
+    displayName: "Plugins maturity test"
+
+  - bash: |
+      set -x
+      RES=0
+      if [ -e /etc/init.d/mysql ] ; then
+        restart_cmd="/etc/init.d/mysql restart"
+      else
+        restart_cmd="systemctl restart mariadb"
+      fi
+
+      plugindir=`sudo mysql -s -s -e 'select @@plugin_dir'`
+      mdev19807_workaround="--plugin-dir=$plugindir"
+
+      id -u bombalurina || sudo useradd bombalurina
+      sudo passwd bombalurina <<EOF
+      an1rul@bm0b
+      an1rul@bm0b
+      EOF
+
+      sudo tee /etc/pam.d/mariadb <<EOF
+      auth required pam_unix.so audit
+      account required pam_unix.so audit
+      EOF
+
+      # PAM v2
+      sudo mysql -e "INSTALL SONAME 'auth_pam'; CREATE USER 'bombalurina'@'localhost' IDENTIFIED VIA pam USING 'mariadb'"
+      if ! mysql $mdev19807_workaround -ubombalurina -pan1rul@bm0b -e "SHOW GRANTS" ; then
+        echo "Authentication with PAM v2 (pam_unix) failed"
+      fi
+      sudo mysql -e "UNINSTALL SONAME 'auth_pam'"
+      if mysql $mdev19807_workaround -ubombalurina -pan1rul@bm0b -e "SHOW GRANTS" > /dev/null 2>&1 ; then
+        echo "User authenticated via PAM v2 (pam_unix) could still connect after uninstalling plugin"
+      fi
+
+      # PAM v1
+      sudo mysql -e "INSTALL SONAME 'auth_pam_v1'"
+      set +e
+      sudo groupadd shadow
+      sudo usermod -a -G shadow mysql
+      sudo chown root:shadow /etc/shadow
+      sudo chmod g+r /etc/shadow
+      set -e
+
+      sudo $restart_cmd
+
+      if ! mysql $mdev19807_workaround -ubombalurina -pan1rul@bm0b -e "SHOW GRANTS" ; then
+        echo "- Authentication with PAM v1 (pam_unix) failed"
+      fi
+
+      sudo mysql -e "UNINSTALL SONAME 'auth_pam_v1'"
+      if mysql $mdev19807_workaround -ubombalurina -pan1rul@bm0b -e "SHOW GRANTS" > /dev/null 2>&1 ; then
+        echo "- User authenticated via PAM v1 (pam_unix) could still connect after uninstalling plugin"
+      fi
+    displayName: "PAM Acceptance test"

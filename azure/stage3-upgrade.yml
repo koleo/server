@@ -1,0 +1,164 @@
+parameters:
+  VERSION: ''
+  FROM: ''
+  FROMVERSION: ''
+  TO: ''
+  TOVERSION: ''
+  REPO: ''
+  REPO_PARAMS: ''
+
+jobs:
+
+- job: Upgrade_${{ parameters.FROM }}_${{ parameters.FROMVERSION }}_to_${{ parameters.TO }}_${{ parameters.TOVERSION }}
+  timeoutInMinutes: 280
+  condition: succeededOrFailed()
+  workspace:
+    clean: all
+  strategy:
+    maxParallel: 1
+    matrix:
+      # rhel-6:
+      #   poolName: 'rhel-6'
+      # rhel-7:
+      #   poolName: 'rhel-7'
+      debian-8:
+        poolName: 'debian-8'
+      debian-9:
+        poolName: 'debian-9'
+      ubuntu-1604:
+        poolName: 'ubuntu-1604'
+      ubuntu-1804:
+        poolName: 'ubuntu-1804'
+  pool:
+    name: $(poolName)
+
+  steps:
+  - checkout: none
+  - template: prepare-vm-for-installation.yml
+  - bash: |
+      set -ex
+      wget ${{ parameters.REPO }} -O install_mariadb.sh
+      chmod +x ./install_mariadb.sh
+      sudo ./install_mariadb.sh ${{ parameters.REPO_PARAMS }}
+      rm -fv ./install_mariadb.sh
+    displayName: "Install ${{ parameters.FROM }}-${{ parameters.FROMVERSION }} repo file and key"
+
+  - bash: |
+      set -ex
+      sudo yum -y install MariaDB-*
+      # we must remove cassandra and tokudb (doesn't exist in ES)
+      sudo yum -y erase MariaDB-cassandra-engine MariaDB-tokudb-engine ||:
+    displayName: "Install ${{ parameters.FROM }}-${{ parameters.FROMVERSION }} on RHEL/Centos"
+    condition: in(variables['poolName'], 'rhel-6', 'rhel-7')
+
+  - bash: |
+      set -ex
+      sudo apt-get update
+      export DEBIAN_FRONTEND=noninteractive
+      mVersion=${{ parameters.VERSION }}
+      if [[ ${mVersion} == '10.2' ]]; then
+        BACKUP_PKG=mariadb-backup-${mVersion}
+      else
+        BACKUP_PKG=mariadb-backup
+      fi
+      sudo apt-get -y install mariadb-server ${BACKUP_PKG} \
+      mariadb-plugin-mroonga mariadb-plugin-oqgraph mariadb-plugin-rocksdb mariadb-plugin-spider \
+      mariadb-test mariadb-test-data
+      # we do not install cassandra and tokudb (doesn't exist in ES)
+    displayName: "Install ${{ parameters.FROM }}-${{ parameters.FROMVERSION }} on Debian/Ubuntu"
+    condition: in(variables['poolName'], 'debian-8', 'debian-9', 'debian-10', 'ubuntu-1604', 'ubuntu-1804')
+
+  - bash: |
+      set -ex
+      if [[ -f /etc/init.d/mysql ]]; then
+        restart_cmd="service mysql restart"
+      else
+        restart_cmd="systemctl restart mysql"
+      fi
+      sudo ${restart_cmd}
+    displayName: "Restart ${{ parameters.FROM }}-${{ parameters.FROMVERSION }}"
+
+  - bash: |
+      set -ex
+      sudo mysql -e 'SELECT 1'
+    displayName: "Check ${{ parameters.FROM }}-${{ parameters.FROMVERSION }} installation on RHEL/Centos"
+    condition: in(variables['poolName'], 'rhel-6', 'rhel-7')
+
+  - bash: |
+      set -ex
+      sudo mysql -p$(MYSQL_PASSWORD) -e 'SELECT 1'
+    displayName: "Check ${{ parameters.FROM }}-${{ parameters.FROMVERSION }} installation on Debian/Ubuntu"
+    condition: in(variables['poolName'], 'debian-8', 'debian-9', 'ubuntu-1604', 'ubuntu-1804')
+
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: 'current'
+      specificBuildWithTriggering: true
+      downloadType: 'single'
+      artifactName: '$(poolName)-RPMS'
+      downloadPath: '$(System.ArtifactsDirectory)/current'
+    condition: in(variables['poolName'], 'rhel-6', 'rhel-7')
+
+  - task: DownloadBuildArtifacts@0
+    inputs:
+      buildType: 'current'
+      specificBuildWithTriggering: true
+      downloadType: 'single'
+      artifactName: '$(poolName)-DEBS'
+      downloadPath: '$(System.ArtifactsDirectory)/current'
+    condition: in(variables['poolName'], 'debian-8', 'debian-9', 'ubuntu-1604', 'ubuntu-1804')
+
+  - bash: |
+      set -x
+      ls -la '$(System.ArtifactsDirectory)'
+      sudo yum -y --nogpgcheck install '$(System.ArtifactsDirectory)'/current/'$(poolName)'-RPMS/*.rpm
+    displayName: "Install built RPM packages on RHEL/Centos"
+    condition: in(variables['poolName'], 'rhel-6', 'rhel-7')
+
+  - bash: |
+      set -xe
+      ls -la '$(System.ArtifactsDirectory)'
+      sudo sh -c "echo 'deb [trusted=yes] file://$(System.ArtifactsDirectory)/current/$(poolName)-DEBS binary/' > ${DEB_LOCAL_LIST}"
+      sudo apt update
+      export DEBIAN_FRONTEND=noninteractive
+      mVersion=${{ parameters.VERSION }}
+      if [[ ${mVersion} == '10.2' ]]; then
+        BACKUP_PKG=mariadb-backup-${mVersion}
+      else
+        BACKUP_PKG=mariadb-backup
+      fi
+      sudo apt-get --allow-unauthenticated -y -f install \
+        mariadb-server mariadb-test ${BACKUP_PKG} mariadb-plugin-connect \
+        mariadb-plugin-cracklib-password-check mariadb-plugin-gssapi-client \
+        mariadb-plugin-gssapi-server mariadb-plugin-mroonga mariadb-plugin-oqgraph \
+        mariadb-plugin-rocksdb mariadb-plugin-spider
+      dpkg -l | grep -iE "galera|maria"
+    displayName: "Install built DEB packages on Debian/Ubuntu"
+    condition: in(variables['poolName'], 'debian-8', 'debian-9', 'ubuntu-1604', 'ubuntu-1804')
+
+  - bash: |
+      set -ex
+      if [[ -f /etc/init.d/mysql ]]; then
+        restart_cmd="service mysql restart"
+      else
+        restart_cmd="systemctl restart mysql"
+      fi
+      sudo ${restart_cmd}
+    displayName: "Restart built ES Server"
+
+  - bash: |
+      set -ex
+      sudo mysql -e 'SELECT 1'
+    displayName: "Check ES installation on RHEL"
+    condition: and(succeeded(), in(variables['poolName'], 'rhel-6', 'rhel-7'))
+
+  - bash: |
+      set -ex
+      sudo mysql -p$(MYSQL_PASSWORD) -e 'SELECT 1'
+    displayName: "Check ES installation on Debian/Ubuntu"
+    condition: and(succeeded(), in(variables['poolName'], 'debian-8', 'debian-9', 'ubuntu-1604', 'ubuntu-1804'))
+
+
+
+
+

@@ -1,0 +1,120 @@
+# C/C++ with GCC
+# Build your C/C++ project with GCC using make.
+# Add steps that publish test results, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/apps/c-cpp/gcc
+
+resources:
+    containers:
+    - container: ubuntu-1804
+      image: mariadbe.azurecr.io/build-es:ubuntu-1804
+      endpoint: acr-mariadbe-connection
+      options: --shm-size 12G
+
+variables:
+  configuration: RelWithDebInfo
+  platform: x64
+  TEST_RESULTS_FILE: 'test-results.log'
+  MTR_FEEDBACK_PLUGIN: 1
+  DEBIAN_FRONTEND: noninteractive
+  MYSQL_VARDIR: '/var/tmp/mtr'
+  DEB_LOCAL_LIST: '/etc/apt/sources.list.d/localInstall.list'
+  BUILDDIR: "$(Build.SourcesDirectory)/padding_for_CPACK_RPM_BUILD_SOURCE_DIRS_PREFIX_ON_ES_BACKUP_DEBUGSOURCE"
+  VERSION: '10.4'
+#
+stages:
+
+- stage: BuildPackages_Stage0
+
+  jobs:
+
+  - template: azure/stage0/build-source-tarball.yml
+  - template: azure/stage0/build-macos-packages.yml
+    parameters:
+      Artifact: Release
+      BuildType: RelWithDebInfo
+
+#################################
+########## STAGE 0 END ##########
+#################################
+
+
+#################################
+######### STAGE 1 BEGIN #########
+#################################
+
+- stage: TestPackages_Stage1
+  dependsOn: BuildPackages_Stage0
+  condition: succeededOrFailed()
+  jobs:
+
+  - job: TestTarball_Quick
+    timeoutInMinutes: 600
+    workspace:
+      clean: all
+    pool:
+      vmImage: 'macOS-latest'
+
+    steps:
+
+    - checkout: none
+
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        specificBuildWithTriggering: true
+        downloadType: 'single'
+        artifactName: 'macOS-latest-Release'
+        downloadPath: '$(System.ArtifactsDirectory)'
+
+    - bash: |
+        df -h
+        ls -la
+        pwd
+        mkdir test
+        tar xzf '$(System.ArtifactsDirectory)'/macOS-latest-Release/mariadb-*.tar.gz \
+          --strip-components=1 -C $(Build.SourcesDirectory)
+        ls -la
+        rm -frv '$(System.ArtifactsDirectory)'/macOS-latest-Release/mariadb-*.tar.gz
+      displayName: "Unpack RelWithDebInfo Tarball"
+
+    - template: azure/tests/mac-mtr-test.yml
+      parameters:
+        MtrArgs: '--verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --parallel=auto --vardir=$(MYSQL_VARDIR)'
+        TestName: 'MTR Normal Test - Release'
+        tarname: 'mtr-normal-test.tar.gz'
+        Artifact: Release
+
+    - template: azure/tests/mac-mtr-test.yml
+      parameters:
+        MtrArgs: '--verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --parallel=auto --suite=spider,spider/bg,engines/funcs,engines/iuds --testcase-timeout=120 --mysqld=--open-files-limit=0 --mysqld=--log-warnings=1 --vardir=$(MYSQL_VARDIR)'
+        TestName: 'MTR Engines test'
+        tarname: 'mtr-engines-test.tar.gz'
+        Artifact: Release
+
+    - template: azure/tests/mac-mtr-test.yml
+      parameters:
+        MtrArgs: '--verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --parallel=auto --suite=funcs_1,funcs_2,stress,jp --testcase-timeout=120 --mysqld=--open-files-limit=0 --mysqld=--log-warnings=1 --vardir=$(MYSQL_VARDIR)'
+        TestName: 'MTR Extra test'
+        tarname: 'mtr-extra-test.tar.gz'
+        Artifact: Release
+
+    - template: azure/tests/mac-mtr-test.yml
+      parameters:
+        MtrArgs: '--verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --parallel=auto --ps-protocol --vardir=$(MYSQL_VARDIR)'
+        TestName: 'MTR PS Protocol test'
+        tarname: 'mtr-ps-protocol-test.tar.gz'
+        Artifact: Release
+
+    - template: azure/tests/mac-mtr-test.yml
+      parameters:
+        MtrArgs: '--force --retry=3 --max-save-core=1 --vardir=${MYSQL_VARDIR} --max-save-datadir=1 --max-test-fail=20 --big-test --parallel=auto'
+        TestName: 'MTR -big test'
+        tarname: 'mtr-big-test.tar.gz'
+        Artifact: Release
+
+
+#
+#################################
+########## STAGE 1 END ##########
+#################################
+#

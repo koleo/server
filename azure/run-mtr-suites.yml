@@ -1,0 +1,77 @@
+
+steps:
+
+  - bash: |
+      set -x
+      MYSQLTEST=$(find /usr/share -name 'mysql-test' ||:)
+      pushd "${MYSQLTEST}"
+
+      if test -f suite/plugins/pam/pam_mariadb_mtr.so; then
+        for p in /lib*/security /lib*/*/security ; do
+          test -f $p/pam_unix.so && sudo cp -v suite/plugins/pam/pam_mariadb_mtr.so $p/
+        done
+        sudo cp -v suite/plugins/pam/mariadb_mtr /etc/pam.d/
+        if ! perl mysql-test-run.pl --verbose-restart --force --mem --suite=plugins --do-test=pam --vardir=${MYSQL_VARDIR}/pam; then
+          RES=1
+          ERRMSG="- MTR PAM tests failed"
+        fi
+      else
+        ERRMSG="- No pam_mariadb_mtr.so library found!"
+      fi
+      popd
+      [[ -n "${ERRMSG}" ]] && echo "${ERRMSG}" >> ${TEST_RESULTS_FILE}
+    displayName: "PAM MTR Test"
+    failOnStderr: false
+
+  - bash: |
+      MYSQLTEST=$(find /usr/share -name 'mysql-test' ||:)
+      cd "${MYSQLTEST}"
+      perl mysql-test-run.pl --verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --mem --parallel=4 --vardir=${MYSQL_VARDIR}/normal
+    displayName: "MTR Normal Test"
+    failOnStderr: false
+
+  - bash: |
+      MYSQLTEST=$(find /usr/share -name 'mysql-test' ||:)
+      cd "${MYSQLTEST}"
+      perl mysql-test-run.pl  --verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --mem --parallel=4 --ps-protocol --vardir=${MYSQL_VARDIR}/psproto
+    displayName: "MTR PS Protocol test"
+    failOnStderr: false
+
+  - bash: |
+      MYSQLTEST=$(find /usr/share -name 'mysql-test' ||:)
+      cd "${MYSQLTEST}"
+      perl mysql-test-run.pl --verbose-restart --force --max-save-core=0 --max-save-datadir=1 --skip-test='rocksdb\..*' --big --big --parallel=2 --testcase-timeout=120 --vardir=${MYSQL_VARDIR}/big_nops
+    displayName: "MTR --big --big Test, no ps-protocol"
+    failOnStderr: false
+
+  - bash: |
+      MYSQLTEST=$(find /usr/share -name 'mysql-test' ||:)
+      cd "${MYSQLTEST}"
+      perl mysql-test-run.pl  --verbose-restart --big --big --ps-protocol --force --retry=3 --max-save-core=0 --max-save-datadir=1 --mem --parallel=4 --ps-protocol --vardir=${MYSQL_VARDIR}/big_ps
+    displayName: "MTR --big --big test, +ps-protocol"
+    failOnStderr: false
+
+  - bash: |
+      MYSQLTEST=$(find /usr/share -name 'mysql-test' ||:)
+      cd "${MYSQLTEST}"
+      perl mysql-test-run.pl  --verbose-restart --big --big --force --retry=3 --max-save-core=0 --max-save-datadir=1 --mem --parallel=4 --testcase-timeout=120 \
+        --suites=galera,wsrep --vardir=${MYSQL_VARDIR}/galera4_big
+    displayName: "MTR Galera --big --big test"
+    failOnStderr: false
+
+  - bash: |
+      MYSQLTEST=$(find /usr/share -name 'mysql-test' ||:)
+      cd "${MYSQLTEST}"
+      perl mysql-test-run.pl  --verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --mem \
+        --parallel=2 --suite=funcs_1,funcs_2,stress,jp --testcase-timeout=120 --mysqld=--open-files-limit=0 --mysqld=--log-warnings=1 --vardir=${MYSQL_VARDIR}/xtra
+    displayName: "MTR Extra test"
+    failOnStderr: false
+
+
+  - bash: |
+      MYSQLTEST=$(find /usr/share -name 'mysql-test' ||:).
+      cd "${MYSQLTEST}"
+      perl mysql-test-run.pl  --verbose-restart --force --retry=3 --max-save-core=0 --max-save-datadir=1 --mem \
+        --parallel=2 --suite=spider,spider/bg,engines/funcs,engines/iuds --testcase-timeout=120 --mysqld=--open-files-limit=0 --mysqld=--log-warnings=1  --vardir=${MYSQL_VARDIR}/engines
+    displayName: "MTR Engines test"
+    failOnStderr: false

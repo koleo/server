@@ -1,0 +1,38 @@
+
+parameters:
+  BuildType: ''
+  MTRArgs: '--mem --max-test-fail=10 --verbose-restart --max-save-datadir=1 --retry=3 --max-save-core=1'
+
+steps:
+
+- task: DownloadBuildArtifacts@0
+  inputs:
+    buildType: 'current'
+    specificBuildWithTriggering: true
+    downloadType: 'single'
+    artifactName: '$(containerImage)-${{ parameters.BuildType }}'
+    downloadPath: '$(System.ArtifactsDirectory)'
+
+- bash: |
+    df -h
+    ls -la
+    pwd
+    mkdir test
+    tar xzf '$(System.ArtifactsDirectory)'/$(containerImage)-${{ parameters.BuildType }}/mariadb-enterprise-*.tar.gz \
+      --strip-components=1 -C $(Build.SourcesDirectory)
+    ls -la
+    rm -frv '$(System.ArtifactsDirectory)'/$(containerImage)-${{ parameters.BuildType }}/mariadb-enterprise-*.tar.gz
+
+- bash: |
+    set -x
+    WSREP_PROVIDER=$(sudo find /usr -type f -name 'libgalera_enterprise_smm.so')
+    export WSREP_PROVIDER
+    echo "WSREP_PROVIDER=${WSREP_PROVIDER}"
+
+    [[ -e ${WSREP_PROVIDER} ]] && ls -la ${WSREP_PROVIDER}
+
+    cd '$(Build.SourcesDirectory)/mysql-test'
+    pwd
+    ls -lah
+    exec perl mysql-test-run.pl --force --parallel=auto ${{ parameters.MTRArgs }}
+  displayName: 'Run MTR on $(containerImage)-${{ parameters.BuildType }}'
