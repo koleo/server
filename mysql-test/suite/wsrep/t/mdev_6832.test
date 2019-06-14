@@ -9,6 +9,7 @@
 SHOW STATUS LIKE 'wsrep_ready';
 --disable_query_log
 eval SET @@global.wsrep_provider='$WSREP_PROVIDER';
+SET SESSION wsrep_sync_wait = 0;
 --enable_query_log
 SHOW STATUS LIKE 'wsrep_ready';
 SET @@global.wsrep_cluster_address='gcomm://';

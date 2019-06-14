@@ -5,6 +5,11 @@
 --source include/big_test.inc
 --source include/galera_cluster.inc
 
+# Save original auto_increment_offset values.
+--let $node_1=node_1
+--let $node_2=node_2
+--source suite/galera/include/auto_increment_offset_save.inc
+
 --source suite/galera/include/galera_sst_set_mysqldump.inc
 
 # Save original auto_increment_offset values.
