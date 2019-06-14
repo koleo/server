@@ -1,5 +1,9 @@
 connection node_2;
 connection node_1;
+connection node_1;
+connection node_2;
+connection node_1;
+# node_1
 CREATE TABLE encryption(a INT primary key, b text) engine=innodb;
 INSERT into encryption values (1, 'VerySecretMessage');
 NOT FOUND /CREATE TABLE encryption\(a INT\)/ in galera.page.00000*
