@@ -76,7 +76,12 @@ MACRO(MYSQL_ADD_PLUGIN)
       SET(compat "with${compat}")
     ENDIF()
 
-    IF (ARG_DISABLED)
+    # check if plugin is on the list of the plugins that shouldn't be compiled
+    LIST (FIND PLUGINS_DONT_COMPILE ${plugin} _index)
+
+    IF (${_index} GREATER -1)
+      SET(howtobuild NO)
+    ELSEIF (ARG_DISABLED)
       SET(howtobuild NO)
     ELSEIF (compat STREQUAL ".")
       SET(howtobuild DYNAMIC)
@@ -260,7 +265,10 @@ MACRO(MYSQL_ADD_PLUGIN)
     ELSE()
       SET(ARG_COMPONENT Server)
     ENDIF()
-    MYSQL_INSTALL_TARGETS(${target} DESTINATION ${INSTALL_PLUGINDIR} COMPONENT ${ARG_COMPONENT})
+    # Check if plugin is a supported enterprise plugin, otherwiser place in the unsupported directory
+    SET(plugindir ${INSTALL_PLUGINDIR})
+    ENTERPRISE_PLUGIN_DIR(${target})
+    MYSQL_INSTALL_TARGETS(${target} DESTINATION ${plugindir} COMPONENT ${ARG_COMPONENT})
     IF(ARG_CONFIG AND INSTALL_SYSCONF2DIR)
       INSTALL(FILES ${ARG_CONFIG} COMPONENT ${ARG_COMPONENT} DESTINATION ${INSTALL_SYSCONF2DIR})
     ENDIF()
@@ -275,7 +283,7 @@ MACRO(MYSQL_ADD_PLUGIN)
 ENDMACRO()
 
 
-# Add all CMake projects under storage  and plugin 
+# Add all CMake projects under storage and plugin 
 # subdirectories, configure sql_builtins.cc
 MACRO(CONFIGURE_PLUGINS)
   IF(NOT WITHOUT_SERVER)
@@ -290,13 +298,24 @@ MACRO(CONFIGURE_PLUGINS)
   ENDFOREACH()
 
   GET_CMAKE_PROPERTY(ALL_VARS VARIABLES)
+
   FOREACH (V ${ALL_VARS})
     IF (V MATCHES "^PLUGIN_" AND ${V} MATCHES "YES")
       STRING(SUBSTRING ${V} 7 -1 plugin)
       STRING(TOLOWER ${plugin} target)
+
       IF (NOT TARGET ${target})
         MESSAGE(FATAL_ERROR "Plugin ${plugin} cannot be built")
       ENDIF()
     ENDIF()
   ENDFOREACH()
+ENDMACRO()
+
+# MENT-4 Place not supported plugins in a separate dir
+MACRO(ENTERPRISE_PLUGIN_DIR plugin)
+  LIST (FIND PLUGINS_NOT_SUPPORTED ${plugin} _index)
+
+  IF (${_index} GREATER -1)
+    SET(plugindir "${INSTALL_MYSQLSHAREDIR}/not_supported")
+  ENDIF()
 ENDMACRO()
