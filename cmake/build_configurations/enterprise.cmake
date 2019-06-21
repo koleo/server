@@ -80,60 +80,6 @@ SET(MAX_INDEXES 128)
 # include aws_key_management plugin in release builds
 OPTION(AWS_SDK_EXTERNAL_PROJECT  "Allow download and build AWS C++ SDK" ON)
 
-SET(FEATURE_SET "community" CACHE STRING 
-" Selection of features. Options are
- - xsmall : 
- - small: embedded
- - classic: embedded + archive + federated + blackhole 
- - large :  embedded + archive + federated + blackhole + innodb
- - xlarge:  embedded + archive + federated + blackhole + innodb + partition
- - community:  all  features (currently == xlarge)
-"
-)
-
-SET(FEATURE_SET_xsmall  1)
-SET(FEATURE_SET_small   2)
-SET(FEATURE_SET_classic 3)
-SET(FEATURE_SET_large   5)
-SET(FEATURE_SET_xlarge  6)
-SET(FEATURE_SET_community 7)
-
-IF(FEATURE_SET)
-  STRING(TOLOWER ${FEATURE_SET} feature_set)
-  SET(num ${FEATURE_SET_${feature_set}})
-  IF(NOT num)
-   MESSAGE(FATAL_ERROR "Invalid FEATURE_SET option '${feature_set}'. 
-   Should be xsmall, small, classic, large, or community
-   ")
-  ENDIF()
-  SET(PLUGIN_PARTITION "NO")
-  IF(num EQUAL FEATURE_SET_xsmall)
-    SET(WITH_NONE ON)
-  ENDIF()
-  
-  IF(num GREATER FEATURE_SET_xsmall AND NOT WIN32)
-    SET(WITH_EMBEDDED_SERVER ON CACHE BOOL "")
-  ENDIF()
-  IF(num GREATER FEATURE_SET_small)
-    SET(PLUGIN_ARCHIVE "STATIC")
-    SET(PLUGIN_BLACKHOLE "STATIC")
-    SET(PLUGIN_FEDERATEDX "STATIC")
-    SET(PLUGIN_FEEDBACK "STATIC")
-  ENDIF()
-  IF(num GREATER FEATURE_SET_classic)
-    SET(PLUGIN_INNOBASE "STATIC")
-  ENDIF()
-  IF(num GREATER FEATURE_SET_large)
-    SET(PLUGIN_PARTITION "STATIC")
-    #SET(PLUGIN_CASSANDRA "STATIC")
-  ENDIF()
-  IF(num GREATER FEATURE_SET_xlarge)
-   # OPTION(WITH_ALL ON) 
-   # better no set this, otherwise server would be linked 
-   # statically with experimental stuff like audit_null
-  ENDIF()
-ENDIF()
-
 SET(WITH_INNODB_SNAPPY OFF CACHE STRING "")
 SET(WITH_NUMA 0 CACHE BOOL "")
 IF(WIN32)
