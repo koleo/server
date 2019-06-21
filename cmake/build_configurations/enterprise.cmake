@@ -57,7 +57,6 @@ SET(PLUGINS_NOT_SUPPORTED
   "example_key_management"
   "federated"
   "federatedx"
-  "gssapi"
   "handlersocket"
   "mroonga"
   "mroonga_stats"
