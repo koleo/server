@@ -40,6 +40,10 @@ SET(CPACK_RPM_PACKAGE_DESCRIPTION "MariaDB Enterprise Server: a very fast and ro
   MariaDB documentation can be found at https://mariadb.com/kb/en/
   MariaDB bug reports should be submitted through https://support.mariadb.com/")
 
+IF(WIN32)
+  SET(MSVC_CRT_TYPE /MT CACHE STRING   "Runtime library - specify runtime library for linking (/MT,/MTd,/MD,/MDd)")
+ENDIF()
+
 # Don't compile the following plugins
 SET(PLUGINS_DONT_COMPILE "SPHINX" "TOKUDB")
 
