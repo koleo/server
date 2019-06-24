@@ -48,8 +48,6 @@ then
   sed "/Package: mariadb-plugin-spider/,/^$/d" -i debian/control
   sed "/Package: mariadb-plugin-oqgraph/,/^$/d" -i debian/control
   sed "/ha_sphinx.so/d" -i debian/mariadb-server-10.6.install
-  sed "/Package: libmariadbd19/,/^$/d" -i debian/control
-  sed "/Package: libmariadbd-dev/,/^$/d" -i debian/control
 fi
 
 if [[ $(arch) =~ i[346]86 ]]

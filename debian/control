@@ -186,45 +186,6 @@ Description: Virtual package to satisfy external libmysqlclient18 depends
  This package provides compatibility symlinks for binaries that expect to find
  libmysqlclient.so.18 will automatically use libmariadb.so.3 instead.
 
-Package: libmariadbd19
-Architecture: any
-Multi-Arch: same
-Section: libs
-Depends: ${misc:Depends},
-         ${shlibs:Depends}
-Breaks: libmariadbd-dev (<< ${source:Version})
-Replaces: libmariadbd-dev (<< ${source:Version})
-Description: MariaDB embedded database, shared library
- MariaDB is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MariaDB are speed, robustness and
- ease of use.
- .
- This package includes a shared library for embedded MariaDB applications.
-
-Package: libmariadbd-dev
-Architecture: any
-Multi-Arch: same
-Section: libdevel
-Provides: libmysqld-dev
-Pre-Depends: ${misc:Pre-Depends}
-Depends: libmariadb-dev (= ${binary:Version}),
-         libmariadbd19 (= ${binary:Version}),
-         ${misc:Depends}
-Breaks: libmariadb-dev (<< ${source:Version}),
-        libmariadbclient-dev (<< ${source:Version}),
-        libmysqld-dev
-Replaces: libmariadb-dev (<< ${source:Version}),
-          libmariadbclient-dev (<< ${source:Version}),
-          libmysqld-dev
-Description: MariaDB embedded database, development files
- MariaDB is a fast, stable and true multi-user, multi-threaded SQL database
- server. SQL (Structured Query Language) is the most popular database query
- language in the world. The main goals of MariaDB are speed, robustness and
- ease of use.
- .
- This package includes the embedded server library development and header files.
-
 Package: mysql-common
 Architecture: all
 Depends: ${misc:Depends}
