@@ -643,19 +643,16 @@ then
     echo
     echo "You can start the MariaDB daemon with:"
     echo "cd '$basedir' ; $bindir/mysqld_safe --datadir='$ldata'"
-    echo
-    echo "You can test the MariaDB daemon with mysql-test-run.pl"
-    echo "cd '$basedir/mysql-test' ; perl mysql-test-run.pl"
   fi
 
   echo
-  echo "Please report any problems at https://mariadb.org/jira"
+  echo "As a MariaDB Corporation subscription customer please contact us"
+  echo "via https://support.mariadb.com/ to report problems."
+  echo "You also can get consultative guidance on questions specific to your deployment,"
+  echo "such as how to tune for performance, high availability, security audits, and code review."
   echo
-  echo "The latest information about MariaDB is available at https://mariadb.org/."
-  echo "You can find additional information about the MySQL part at:"
-  echo "https://dev.mysql.com"
-  echo "Consider joining MariaDB's strong and vibrant community:"
-  echo "https://mariadb.org/get-involved/"
+  echo "You also find detailed documentation about how to use MariaDB Enterprise Server at https://mariadb.com/docs/."
+  echo "The latest information about MariaDB Server is available at https://mariadb.com/kb/en/library/release-notes/."
   echo
 fi
 
