@@ -390,9 +390,8 @@ ADD_CUSTOM_TARGET(distclean
   )
 
 SET(ENTERPRISE_CNF_FILE ${CMAKE_SOURCE_DIR}/support-files/rpm/mariadb-enterprise.cnf)
-SET(MY_CNF_FILE ${CMAKE_SOURCE_DIR}/support-files/rpm/my.cnf)
-INSTALL(FILES ${MY_CNF_FILE} DESTINATION etc/ COMPONENT Common)
-INSTALL(FILES ${ENTERPRISE_CNF_FILE} DESTINATION etc/my.cnf.d COMPONENT Common)
+INSTALL(FILES ${DBOPT_FILE} DESTINATION data/test COMPONENT DataFiles)
+INSTALL(FILES ${ENTERPRISE_CNF_FILE} DESTINATION etc COMPONENT Common)
 
 # Install initial database (default on windows, optional target elsewhere)
 IF(TARGET mariadbd AND NOT CMAKE_CROSSCOMPILING)

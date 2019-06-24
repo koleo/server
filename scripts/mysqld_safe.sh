@@ -608,10 +608,10 @@ parse_arguments `$print_defaults $defaults --loose-verbose mysqld_safe safe_mysq
 unrecognized_handling=collect
 parse_arguments "$@"
 
-if [ -z "$defaults" ]; then
-   defaults="--defaults-extra-file=${MY_BASEDIR_VERSION}/etc/my.cnf.d/mariadb-enterprise.cnf"
+enterprise_cnf="${MY_BASEDIR_VERSION}/etc/mariadb-enterprise.cnf"
+if [ -z "$defaults" -a -f "$enterprise_cnf" ]; then
+   defaults="--defaults-extra-file=$enterprise_cnf"
 fi
-
 
 #
 # Try to find the plugin directory
