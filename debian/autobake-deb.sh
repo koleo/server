@@ -76,6 +76,7 @@ echo "Incrementing changelog and starting build scripts"
 
 # Find major.minor version
 source ./VERSION
+MYSQL_VERSION_EXTRA=${MYSQL_VERSION_EXTRA/-/.}
 UPSTREAM="${MYSQL_VERSION_MAJOR}.${MYSQL_VERSION_MINOR}.${MYSQL_VERSION_PATCH}${MYSQL_VERSION_EXTRA}"
 PATCHLEVEL="+maria"
 LOGSTRING="MariaDB build"
