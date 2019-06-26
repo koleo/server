@@ -3,6 +3,9 @@
 #
 --source include/have_innodb.inc
 --source include/have_file_key_management_plugin.inc
+if (!$DEBUG_KEY_MANAGEMENT_SO) {
+  --skip Needs debug_key_management
+}
 
 call mtr.add_suppression('debug.key.management');
 
