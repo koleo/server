@@ -111,6 +111,7 @@ enum enum_wsrep_reject_types {
 enum enum_wsrep_OSU_method {
     WSREP_OSU_TOI,
     WSREP_OSU_RSU,
+    WSREP_OSU_NBO,
     WSREP_OSU_NONE
 };
 
@@ -211,7 +212,7 @@ extern void wsrep_close_applier_threads(int count);
 
 
 /* new defines */
-extern void wsrep_stop_replication(THD *thd);
+extern void wsrep_stop_replication(THD *thd, bool kill_clients= true);
 extern bool wsrep_start_replication();
 extern void wsrep_shutdown_replication();
 extern bool wsrep_must_sync_wait (THD* thd, uint mask= WSREP_SYNC_WAIT_BEFORE_READ);
@@ -221,6 +222,69 @@ wsrep_sync_wait_upto (THD* thd, wsrep_gtid_t* upto, int timeout);
 extern void wsrep_last_committed_id (wsrep_gtid_t* gtid);
 extern int  wsrep_check_opts();
 extern void wsrep_prepend_PATH (const char* path);
+
+void wsrep_nbo_phase_one_end(THD *thd);
+int wsrep_nbo_phase_two_begin(THD *thd);
+
+class Wsrep_nbo_notify_context
+{
+public:
+  Wsrep_nbo_notify_context(mysql_mutex_t *mutex,
+                           mysql_cond_t *cond)
+    : m_err()
+    , m_apply_error(0)
+    , m_mutex(mutex)
+    , m_cond(cond)
+    , m_notified()
+  { }
+
+  void notify(int apply_error)
+  {
+    mysql_mutex_lock(m_mutex);
+    m_notified= true;
+    m_apply_error = apply_error;
+    mysql_cond_signal(m_cond);
+    mysql_mutex_unlock(m_mutex);
+  }
+
+  void set_error(const wsrep::mutable_buffer& err)
+  {
+    assert(!m_notified);
+    mysql_mutex_lock(m_mutex);
+    m_err = err;
+    mysql_mutex_unlock(m_mutex);
+  }
+
+  /**
+   * Wait for call to notify() from NBO thread, returning any errors
+   * encountered during NBO execution.
+   *
+   * @param Output param, error buffer for error voting.
+   *
+   * @return Non-zero if there were any applying errors, zero otherwise.
+   */
+  int wait(wsrep::mutable_buffer& err)
+  {
+    mysql_mutex_lock(m_mutex);
+    while (!m_notified)
+    {
+      mysql_cond_wait(m_cond, m_mutex);
+    }
+    err = m_err;
+    int ret_err = m_apply_error;
+    mysql_mutex_unlock(m_mutex);
+    return ret_err;
+  }
+
+private:
+  Wsrep_nbo_notify_context(const Wsrep_nbo_notify_context&);
+  Wsrep_nbo_notify_context& operator=(const Wsrep_nbo_notify_context&);
+  wsrep::mutable_buffer m_err;
+  int m_apply_error;
+  mysql_mutex_t *m_mutex;
+  mysql_cond_t *m_cond;
+  bool m_notified;
+};
 
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
@@ -402,6 +466,7 @@ extern PSI_thread_key key_wsrep_sst_joiner;
 extern PSI_thread_key key_wsrep_sst_donor;
 extern PSI_thread_key key_wsrep_rollbacker;
 extern PSI_thread_key key_wsrep_applier;
+extern PSI_thread_key key_wsrep_nbo_worker;
 extern PSI_thread_key key_wsrep_sst_joiner_monitor;
 extern PSI_thread_key key_wsrep_sst_donor_monitor;
 #endif /* HAVE_PSI_INTERFACE */

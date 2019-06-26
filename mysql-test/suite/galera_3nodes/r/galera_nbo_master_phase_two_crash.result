@@ -1,0 +1,72 @@
+connection node_2;
+connection node_1;
+connection node_1;
+connection node_2;
+connection node_3;
+connection node_2;
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+SET GLOBAL debug_dbug = 'd,sync.wsrep_alter_locked_tables';
+SET SESSION wsrep_OSU_method='NBO';
+ALTER TABLE t1 LOCK=SHARED, ADD COLUMN f2 INTEGER;;
+connect node_2b, 127.0.0.1, root, , test, $NODE_MYPORT_2;
+connection node_2b;
+connection node_2b;
+SET GLOBAL lock_wait_timeout = 3;
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=2';
+SET GLOBAL debug_dbug = '';
+SET DEBUG_SYNC= 'now SIGNAL signal.wsrep_alter_locked_tables';
+connection node_3;
+connection node_2;
+ERROR HY000: Got error 8 "Exec format error" during COMMIT
+SET wsrep_sync_wait=0;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL,
+  `f2` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+connection node_3;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL,
+  `f2` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+connection node_1;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL,
+  `f2` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+connection node_2;
+SET SESSION wsrep_on = OFF;
+# restart
+connection node_2;
+connection node_1;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL,
+  `f2` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+connection node_2;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL,
+  `f2` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+connection node_3;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) DEFAULT NULL,
+  `f2` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+connection node_1;
+DROP TABLE t1;
+connection node_2;
+CALL mtr.add_suppression("WSREP: exception from gcomm, backend must be restarted: Gcomm backend termination was requested by setting gmcast.isolate=2.");
+CALL mtr.add_suppression("WSREP: closing during nonblocking operation.");
+CALL mtr.add_suppression("WSREP: discarding [0-9]* message");

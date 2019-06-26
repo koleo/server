@@ -1,5 +1,7 @@
 connection node_2;
 connection node_1;
+connection node_1;
+connection node_2;
 CREATE TABLE t1 (f1 INTEGER PRIMARY KEY, f2 CHAR(1)) ENGINE=InnoDB;
 connection node_1;
 SET GLOBAL wsrep_on=OFF;

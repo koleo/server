@@ -1,0 +1,82 @@
+#
+# This test has the master (node #2) fail the second phase of NBO due to the provider crashing.
+#
+
+--source include/galera_cluster.inc
+--source include/big_test.inc
+
+--let $galera_connection_name = node_3
+--let $galera_server_number = 3
+--source include/galera_connect.inc
+
+--let $node_1=node_1
+--let $node_2=node_2
+--let $node_3=node_3
+--source ../galera/include/auto_increment_offset_save.inc
+
+--connection node_2
+CREATE TABLE t1 (f1 INTEGER) ENGINE=InnoDB;
+
+SET GLOBAL debug_dbug = 'd,sync.wsrep_alter_locked_tables';
+
+SET SESSION wsrep_OSU_method='NBO';
+--send ALTER TABLE t1 LOCK=SHARED, ADD COLUMN f2 INTEGER;
+
+--connect node_2b, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2b
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: now';
+--source include/wait_condition.inc
+
+--connection node_2b
+SET GLOBAL lock_wait_timeout = 3;
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=2'; # crash the provider
+SET GLOBAL debug_dbug = '';
+SET DEBUG_SYNC= 'now SIGNAL signal.wsrep_alter_locked_tables';
+
+# Wait until node #2 leaves the cluster
+--connection node_3
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+--connection node_2
+--error ER_ERROR_DURING_COMMIT
+--reap
+
+# node two fails TOI for NBO phase two, but still completes the DDL operation
+SET wsrep_sync_wait=0;
+--let $wait_condition = SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1'
+SHOW CREATE TABLE t1;
+--source include/wait_condition.inc
+
+# other nodes complete the NBO normally
+--connection node_3
+SHOW CREATE TABLE t1;
+--connection node_1
+SHOW CREATE TABLE t1;
+
+--connection node_2
+# restart node_2
+SET SESSION wsrep_on = OFF;
+--source include/restart_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status'
+--source include/wait_condition.inc
+
+--connection node_1
+SHOW CREATE TABLE t1;
+--connection node_2
+SHOW CREATE TABLE t1;
+--connection node_3
+SHOW CREATE TABLE t1;
+
+--connection node_1
+DROP TABLE t1;
+
+--connection node_2
+CALL mtr.add_suppression("WSREP: exception from gcomm, backend must be restarted: Gcomm backend termination was requested by setting gmcast.isolate=2.");
+CALL mtr.add_suppression("WSREP: closing during nonblocking operation.");
+CALL mtr.add_suppression("WSREP: discarding [0-9]* message");
+
+--source ../galera/include/auto_increment_offset_restore.inc

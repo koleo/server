@@ -1,0 +1,109 @@
+#
+# Test the case where a master node (node #2) goes non-primary while a DDL is running
+# The DDL times out and the node leaves the cluster, to rejoin via SST.
+#
+
+--source include/galera_cluster.inc
+--source include/have_debug_sync.inc
+--source include/have_debug.inc
+--source include/big_test.inc
+
+--let $galera_connection_name = node_3
+--let $galera_server_number = 3
+--source include/galera_connect.inc
+
+--let $node_1=node_1
+--let $node_2=node_2
+--let $node_3=node_3
+--source suite/galera/include/auto_increment_offset_save.inc
+
+CREATE TABLE t1 (f1 INTEGER NOT NULL) ENGINE=InnoDB;
+INSERT INTO t1 VALUES (1);
+
+# Issue a DDL
+
+--connection node_2
+SET GLOBAL debug_dbug = 'd,sync.wsrep_alter_locked_tables';
+SET SESSION wsrep_osu_method=NBO;
+SET SESSION lock_wait_timeout=2;
+--send ALTER TABLE t1 ALGORITHM=INPLACE, LOCK=SHARED, ADD COLUMN f2 INTEGER;
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'debug sync point: now';
+--source include/wait_condition.inc
+
+# Isolate the master (node #2)
+
+SET GLOBAL wsrep_provider_options = 'gmcast.isolate=1';
+
+--connection node_1
+--source include/wait_until_connected_again.inc
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT COUNT(*) = 2 FROM mysql.wsrep_cluster_members;
+--source include/wait_condition.inc
+
+# Confirm that the DDL remains blocked in NBO
+
+--connection node_2a
+SET GLOBAL debug_dbug = '';
+SET DEBUG_SYNC= 'now SIGNAL signal.wsrep_alter_locked_tables';
+SET DEBUG_SYNC = 'now WAIT_FOR signal.wsrep_alter_locked_tables_continued';
+SET DEBUG_SYNC = 'RESET';
+
+SET SESSION wsrep_on=OFF;
+SET SESSION wsrep_sync_wait = 0;
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE STATE = 'acquiring total order isolation for NBO phase two'
+--source include/wait_condition.inc
+
+# DDL should now return a failure
+
+--connection node_2
+--error ER_LOCK_WAIT_TIMEOUT
+--reap
+
+# NBO phase two failure shuts down node #2 provider
+
+--connection node_2
+SET SESSION wsrep_sync_wait = 0;
+SELECT VARIABLE_VALUE = 'Disconnected' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+
+# node_2 finishes DDL even if phase two begin fails
+--let $wait_condition = SELECT COUNT(*) = 2 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 't1'
+--source include/wait_condition.inc
+
+--connection node_1
+INSERT INTO t1 VALUES (2,2);
+
+--connection node_2
+# So we restart it to force SST
+SET SESSION wsrep_on = OFF;
+--source include/restart_mysqld.inc
+--source include/wait_until_connected_again.inc
+
+# Confirm that the nodes are identical
+
+--connection node_1
+--let $wait_condition = SELECT VARIABLE_VALUE = 3 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+SHOW CREATE TABLE t1;
+SELECT COUNT(*) = 2 FROM t1;
+
+--connection node_2
+--let $wait_condition = SELECT VARIABLE_VALUE = 'Primary' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status'
+--source include/wait_condition.inc
+
+SHOW CREATE TABLE t1;
+SELECT COUNT(*) = 2 FROM t1;
+
+--connection node_1
+DROP TABLE t1;
+
+--source suite/galera/include/auto_increment_offset_restore.inc
+
+--connection node_2
+CALL mtr.add_suppression("Lock wait timeout while waiting NBO end to replicate");
+CALL mtr.add_suppression("Failed to acquire total order isolation for non-blocking DDL end event, provider returned error code 6");
+CALL mtr.add_suppression("This will leave database in inconsistent state since DDL execution cannot be terminated in order");
+CALL mtr.add_suppression("NBO phase two begin failed for:");

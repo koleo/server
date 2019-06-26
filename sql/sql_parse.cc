@@ -2293,9 +2293,16 @@ dispatch_end:
       DBUG_ASSERT((command != COM_QUIT && command != COM_STMT_CLOSE)
                   || thd->get_stmt_da()->is_disabled());
       DBUG_ASSERT(thd->wsrep_trx().state() != wsrep::transaction::s_replaying);
-      /* wsrep BF abort in query exec phase */
+      /*
+        Wsrep BF abort in query exec phase.
+
+        COM_SHUTDOWN may cause THD to be killed by shutdown process before it
+        gets here. always do end of statement for it to avoid client getting
+        connection error.
+      */
       mysql_mutex_lock(&thd->LOCK_thd_kill);
-      do_end_of_statement= thd_is_connection_alive(thd);
+      do_end_of_statement= (thd_is_connection_alive(thd) ||
+                            command == COM_SHUTDOWN);
       mysql_mutex_unlock(&thd->LOCK_thd_kill);
     }
   }
@@ -5825,7 +5832,14 @@ wsrep_error_label:
   res= true;
 
 finish:
-
+#ifdef WITH_WSREP
+  int nbo_phase_two_failed= wsrep_nbo_phase_two_begin(thd);
+  if (nbo_phase_two_failed)
+  {
+    // we can't rollback the DDL, so we let it complete
+    res= true;
+  }
+#endif /* WITH_WSREP */
   thd->reset_query_timer();
   DBUG_ASSERT(!thd->in_active_multi_stmt_transaction() ||
                thd->in_multi_stmt_transaction_mode());
@@ -5961,6 +5975,12 @@ finish:
 
   /* assume PA safety for next transaction */
   thd->wsrep_PA_safe= true;
+
+  if (nbo_phase_two_failed)
+  {
+    // node may be inconsistent, leave cluster
+    wsrep_stop_replication(thd, false);
+  }
 #endif /* WITH_WSREP */
 
   DBUG_RETURN(res || thd->is_error());

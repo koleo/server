@@ -396,9 +396,13 @@ int Wsrep_high_priority_service::apply_toi(const wsrep::ws_meta& ws_meta,
   WSREP_DEBUG("Wsrep_high_priority_service::apply_toi: %lld",
               client_state.toi_meta().seqno().get());
 
-  int ret= apply_events(thd, m_rli, data, err);
-  wsrep_thd_set_ignored_error(thd, false);
-  trans_commit(thd);
+  int ret= 0;
+  if (!wsrep::rolls_back_transaction(ws_meta.flags()))
+  {
+      ret= apply_events(thd, m_rli, data, err);
+      wsrep_thd_set_ignored_error(thd, false);
+      trans_commit(thd);
+  }
 
   thd->close_temporary_tables();
   thd->lex->sql_command= SQLCOM_END;
@@ -543,12 +547,172 @@ int Wsrep_applier_service::apply_write_set(const wsrep::ws_meta& ws_meta,
   DBUG_RETURN(ret);
 }
 
+struct Wsrep_apply_nbo_args
+{
+  THD *thd;
+  wsrep::ws_meta ws_meta;
+  wsrep::const_buffer data;
+  Wsrep_nbo_notify_context* notify;
+};
+
+static void* process_apply_nbo(void *args_ptr)
+{
+  Wsrep_apply_nbo_args* args= static_cast<Wsrep_apply_nbo_args*>(args_ptr);
+  /* Make private copy of the data, buffer from provider is not guaranteed
+     to stay valid when the applier continues in apply_nbo_begin(). */
+  wsrep::mutable_buffer data;
+  data.push_back(static_cast<const char*>(args->data.ptr()),
+                 static_cast<const char*>(args->data.ptr()) + args->data.size());
+  THD *thd= args->thd;
+  int apply_err;
+  if (my_thread_init())
+  {
+      WSREP_ERROR("Failed to create/initialize NBO worker thread");
+      apply_err= 1;
+      goto error;
+  }
+
+  thd->thread_stack= (char*)&thd;
+  thd->store_globals();
+  thd->security_ctx->skip_grants();
+  thd->real_id= pthread_self();
+  thd->net.vio= 0;
+  thd->clear_error();
+  thd->variables.tx_isolation= ISO_READ_COMMITTED;
+  thd->tx_isolation          = ISO_READ_COMMITTED;
+
+  thd->wsrep_applier= true;
+  server_threads.insert(thd);
+  mysql_thread_set_psi_id(thd->thread_id);
+  thd->system_thread= SYSTEM_THREAD_SLAVE_SQL;
+  thd_proc_info(thd, "wsrep NBO worker");
+
+  /* From trans_begin() */
+  thd->variables.option_bits|= OPTION_BEGIN;
+  thd->server_status|= SERVER_STATUS_IN_TRANS;
+  thd->wsrep_rgi= wsrep_relay_group_init(thd, "wsrep_relay");
+  thd->wsrep_rgi->thd= thd;
+  thd->system_thread_info.rpl_sql_info=
+    new rpl_sql_thread_info(thd->wsrep_rgi->rli->mi->rpl_filter);
+  thd->prior_thr_create_utime= thd->start_utime= microsecond_interval_timer();
+  thd->set_command(COM_SLEEP);
+  thd->reset_for_next_command(true);
+
+  thd->wsrep_nbo_notify_ctx= args->notify;
+  wsrep_open(thd);
+  if (wsrep_before_command(thd))
+  {
+    WSREP_ERROR("NBO worker wsrep_before_command() failed");
+    apply_err= 1;
+    goto error;
+  }
+  if (thd->wsrep_cs().enter_nbo_mode(args->ws_meta))
+  {
+    WSREP_ERROR("NBO worker enter_nbo_mode() failed");
+    apply_err= 1;
+    goto error;
+  }
+
+  apply_err= wsrep_apply_events(thd, thd->wsrep_rgi->rli,
+                              data.data(), data.size());
+  if (apply_err || wsrep_thd_has_ignored_error(thd))
+  {
+    wsrep_thd_set_ignored_error(thd, false);
+    if (apply_err && thd->wsrep_nbo_notify_ctx)
+    {
+      wsrep::mutable_buffer err;
+      wsrep_store_error(thd, err);
+      thd->wsrep_nbo_notify_ctx->set_error(err);
+    }
+    wsrep_dump_rbr_buf_with_header(thd, data.data(), data.size());
+  }
+
+  if (wsrep_current_error(thd))
+  {
+    trans_rollback(thd);
+  }
+  else
+  {
+    trans_commit(thd);
+  }
+
+  delete thd->system_thread_info.rpl_sql_info;
+  if (thd->wsrep_rgi && thd->wsrep_rgi->rli)
+    delete thd->wsrep_rgi->rli->mi;
+  if (thd->wsrep_rgi)
+    delete thd->wsrep_rgi->rli;
+  delete thd->wsrep_rgi;
+  thd->wsrep_rgi= NULL;
+
+  thd->close_temporary_tables();
+  thd->lex->sql_command= SQLCOM_END;
+
+error:
+  /* Nowhere to report the error. */
+  thd->wsrep_cs().reset_error();
+  wsrep_after_command_ignore_result(thd);
+  wsrep_close(thd);
+  if (thd->wsrep_nbo_notify_ctx)
+  {
+    thd->wsrep_nbo_notify_ctx->notify(apply_err);
+    thd->wsrep_nbo_notify_ctx= 0;
+  }
+  server_threads.erase(thd);
+  delete thd;
+
+  my_thread_end();
+
+  return 0;
+}
+
 int Wsrep_applier_service::apply_nbo_begin(const wsrep::ws_meta& ws_meta,
                                            const wsrep::const_buffer& data,
                                            wsrep::mutable_buffer& err)
 {
   DBUG_ENTER("Wsrep_applier_service::apply_nbo_begin");
-  DBUG_RETURN(0);
+  if (wsrep::rolls_back_transaction(ws_meta.flags()))
+  {
+    if (!ws_meta.gtid().is_undefined())
+    {
+      wsrep_set_SE_checkpoint(ws_meta.gtid(),wsrep_gtid_server.gtid());
+    }
+    must_exit_= check_exit_status();
+    DBUG_RETURN(0);
+  }
+  /*
+    - Allocate a new THD and launch worker thread for NBO
+    - If thread creation is successful, wait for signal from worker thread.
+      Else delete THD and return error.
+   */
+  THD *thd= new THD(next_thread_id(), false);
+  /* Disable general logging on applier threads */
+  thd->variables.option_bits |= OPTION_LOG_OFF;
+  /* Enable binlogging if opt_log_slave_updates is set */
+  if (opt_log_slave_updates)
+    thd->variables.option_bits|= OPTION_BIN_LOG;
+  else
+    thd->variables.option_bits&= ~(OPTION_BIN_LOG);
+
+  Wsrep_nbo_notify_context notify_ctx(&m_thd->LOCK_thd_data,
+                                      &m_thd->COND_wsrep_thd);
+  Wsrep_apply_nbo_args* args= new Wsrep_apply_nbo_args{
+    thd, ws_meta, data, &notify_ctx};
+  pthread_t th;
+  if (mysql_thread_create(key_wsrep_nbo_worker, &th, NULL, &process_apply_nbo, args)) {
+    WSREP_ERROR("Failed to allocate THD for NBO execution");
+    delete args;
+    DBUG_RETURN(1);
+  }
+  pthread_detach(th);
+  int apply_err = notify_ctx.wait(err);
+
+  if (!ws_meta.gtid().is_undefined())
+  {
+    wsrep_set_SE_checkpoint(ws_meta.gtid(), wsrep_gtid_server.gtid());
+  }
+  must_exit_= check_exit_status();
+
+  DBUG_RETURN(apply_err);
 }
 
 void Wsrep_applier_service::after_apply()

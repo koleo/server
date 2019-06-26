@@ -1,0 +1,39 @@
+connection node_2;
+connection node_1;
+connection node_1;
+CREATE TABLE t1 (f1 INTEGER NOT NULL) ENGINE=InnoDB;
+connection node_2;
+SET GLOBAL DEBUG_DBUG = 'd,sync.wsrep_alter_locked_tables';
+SET SESSION wsrep_sync_wait = 0;
+connection node_1;
+SET SESSION wsrep_osu_method=NBO;
+ALTER TABLE t1 LOCK=SHARED, ALGORITHM=COPY, ADD PRIMARY KEY (f1);;
+connection node_2;
+SET SESSION lock_wait_timeout = 3;
+ALTER TABLE t1 LOCK=SHARED, ALGORITHM=COPY, ADD PRIMARY KEY (f1);
+ERROR 40001: Deadlock found when trying to get lock; try restarting transaction
+SET GLOBAL DEBUG_DBUG = '';
+SET DEBUG_SYNC= 'now SIGNAL signal.wsrep_alter_locked_tables';
+SET DEBUG_SYNC= 'now WAIT_FOR signal.wsrep_alter_locked_tables_continued';
+SET DEBUG_SYNC = 'RESET';
+connection node_1;
+connection node_2;
+ALTER TABLE t1 LOCK=SHARED, ALGORITHM=COPY, ADD PRIMARY KEY (f1);
+ERROR 42000: Multiple primary key defined
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+CALL mtr.add_suppression("ALTER TABLE isolation failure");
+connection node_1;
+SHOW CREATE TABLE t1;
+Table	Create Table
+t1	CREATE TABLE `t1` (
+  `f1` int(11) NOT NULL,
+  PRIMARY KEY (`f1`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1
+CALL mtr.add_suppression("Slave SQL: Error");
+SET SESSION wsrep_osu_method=TOI;
+DROP TABLE t1;
