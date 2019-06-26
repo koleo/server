@@ -3,7 +3,7 @@
   <Product 
     Id="*" 
     UpgradeCode="@CPACK_WIX_UPGRADE_CODE@"
-    Name="@CPACK_WIX_PACKAGE_NAME@" 
+    Name="MariaDB Enterprise Server @MAJOR_VERSION@.@MINOR_VERSION@ (x64)" 
     Version="@MAJOR_VERSION@.@MINOR_VERSION@.@PATCH_VERSION@.@TINY_VERSION@" 
     Language="1033" 
     Manufacturer="@MANUFACTURER@">
