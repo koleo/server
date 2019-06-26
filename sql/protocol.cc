@@ -426,7 +426,7 @@ bool Protocol::net_send_error_packet(THD *thd, uint sql_errno, const char *err,
   char buff[2+1+SQLSTATE_LENGTH+MYSQL_ERRMSG_SIZE], *pos;
   my_bool ret;
   uint8 save_compress;
-  DBUG_ENTER("Protocol::send_error_packet");
+  DBUG_ENTER("Protocol::net_send_error_packet");
 
   if (net->vio == 0)
   {
