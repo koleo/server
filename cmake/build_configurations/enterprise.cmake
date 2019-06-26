@@ -44,6 +44,8 @@ IF(WIN32)
   SET(MSVC_CRT_TYPE /MT CACHE STRING   "Runtime library - specify runtime library for linking (/MT,/MTd,/MD,/MDd)")
 ENDIF()
 
+SET(PLUGIN_S3 STATIC CACHE STRING "")
+
 # Don't compile the following plugins
 SET(PLUGINS_DONT_COMPILE "SPHINX" "TOKUDB")
 
