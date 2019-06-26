@@ -1,0 +1,508 @@
+CREATE TABLE IF NOT EXISTS mysql.server_audit_filters (
+filtername char(80) COLLATE utf8_bin NOT NULL DEFAULT '',
+rule longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT 'true' CHECK (json_valid(rule)),
+CONSTRAINT c_filtername UNIQUE (filtername)
+) ENGINE=Aria;
+CREATE TABLE IF NOT EXISTS mysql.server_audit_users (host char(60) COLLATE utf8_bin NOT NULL DEFAULT '',
+user char(80) COLLATE utf8_bin NOT NULL DEFAULT '',
+filtername char(80) NOT NULL DEFAULT '',
+CONSTRAINT c_host_user UNIQUE (host, user)
+) ENGINE=Aria;
+install plugin server_audit soname 'server_audit2';
+show variables like 'server_audit%';
+Variable_name	Value
+server_audit_file_path	server_audit.log
+server_audit_file_rotate_now	OFF
+server_audit_file_rotate_size	1000000
+server_audit_file_rotations	9
+server_audit_logging	OFF
+server_audit_mode	0
+server_audit_output_type	file
+server_audit_query_log_limit	1024
+server_audit_reload_filters	OFF
+server_audit_syslog_facility	LOG_USER
+server_audit_syslog_ident	mysql-server_auditing
+server_audit_syslog_info	
+server_audit_syslog_priority	LOG_INFO
+set global server_audit_file_path=null;
+set global server_audit_file_path='server_audit.log';
+set global server_audit_output_type=file;
+set global server_audit_logging=on;
+SHOW GLOBAL STATUS LIKE "server_audit%";
+Variable_name	Value
+Server_audit_active	ON
+Server_audit_current_log	server_audit.log
+Server_audit_last_error	
+Server_audit_session_filter	N/A
+Server_audit_writes_failed	0
+connect  con1,localhost,root,,mysql;
+connection default;
+disconnect con1;
+connect(localhost,no_such_user,,mysql,MASTER_PORT,MASTER_SOCKET);
+connect  con1,localhost,no_such_user,,mysql;
+ERROR 28000: Access denied for user 'no_such_user'@'localhost' (using password: NO)
+connection default;
+create table t1 (id int);
+create table t2 (id int);
+insert into t1 values (1), (2);
+select * from t1;
+id
+1
+2
+insert into t2 values (1), (2);
+select * from t2;
+id
+1
+2
+alter table t1 rename renamed_t1;
+select 1,
+2,
+# comment
+3;
+1	2	3
+1	2	3
+insert into t2 values (1), (2);
+select * from t2;
+id
+1
+2
+1
+2
+select * from t_doesnt_exist;
+ERROR 42S02: Table 'test.t_doesnt_exist' doesn't exist
+syntax_error_query;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'syntax_error_query' at line 1
+drop table renamed_t1, t2;
+show variables like 'server_audit%';
+Variable_name	Value
+server_audit_file_path	server_audit.log
+server_audit_file_rotate_now	OFF
+server_audit_file_rotate_size	1000000
+server_audit_file_rotations	9
+server_audit_logging	ON
+server_audit_mode	0
+server_audit_output_type	file
+server_audit_query_log_limit	1024
+server_audit_reload_filters	OFF
+server_audit_syslog_facility	LOG_USER
+server_audit_syslog_ident	mysql-server_auditing
+server_audit_syslog_info	
+server_audit_syslog_priority	LOG_INFO
+create database sa_db;
+connect  con1,localhost,root,,test;
+connection con1;
+create table t1 (id2 int);
+insert into t1 values (1), (2);
+select * from t1;
+id2
+1
+2
+drop table t1;
+use sa_db;
+create table sa_t1(id int);
+insert into sa_t1 values (1), (2);
+drop table sa_t1;
+drop database sa_db;
+connection default;
+disconnect con1;
+create database sa_db;
+use sa_db;
+CREATE USER u1 IDENTIFIED BY 'pwd-123';
+GRANT ALL ON sa_db TO u2 IDENTIFIED BY "pwd-321";
+SET PASSWORD FOR u1 = PASSWORD('pwd 098');
+CREATE USER u3 IDENTIFIED BY '';
+drop user u1, u2, u3;
+INSERT INTO mysql.server_audit_filters VALUES ('log_all','{}');
+INSERT INTO mysql.server_audit_filters VALUES ('query_ddl','{"query_event" : "DDL"}');
+INSERT INTO mysql.server_audit_filters VALUES ('query_dcl','{"query_event" : "DCL"}');
+INSERT INTO mysql.server_audit_filters VALUES ('query_dml','{"query_event" : "DML"}');
+INSERT INTO mysql.server_audit_filters VALUES ('dml_no_select','{"query_event" : "DML_NO_SELECT"}');
+INSERT INTO mysql.server_audit_filters VALUES ('ddl_dml','{"query_event" : ["DDL", "DML"]}');
+INSERT INTO mysql.server_audit_users VALUES ('%','root','query_ddl');
+SET GLOBAL server_audit_reload_filters=ON;
+create table t1(id int);
+insert into t1 values (1), (2);
+select * from t1;
+id
+1
+2
+select 2;
+2
+2
+(select 2);
+2
+2
+/*! select 2*/;
+2
+2
+/*comment*/ select 2;
+2
+2
+drop table t1;
+UPDATE mysql.server_audit_users SET filtername= 'ddl_dml' where host='%' and user='root';
+SET GLOBAL server_audit_reload_filters=ON;
+create table t1(id int);
+insert into t1 values (1), (2);
+select * from t1;
+id
+1
+2
+select 2;
+2
+2
+drop table t1;
+UPDATE mysql.server_audit_users SET filtername= 'query_dml' where host='%' and user='root';
+SET GLOBAL server_audit_reload_filters=ON;
+create table t1(id int);
+insert into t1 values (1), (2);
+select * from t1;
+id
+1
+2
+select 2;
+2
+2
+(select 2);
+2
+2
+/*! select 2*/;
+2
+2
+/*comment*/ select 2;
+2
+2
+drop table t1;
+UPDATE mysql.server_audit_users SET filtername= 'query_dcl' where host='%' and user='root';
+SET GLOBAL server_audit_reload_filters=ON;
+create table t1(id int);
+insert into t1 values (1), (2);
+select * from t1;
+id
+1
+2
+CREATE USER u1 IDENTIFIED BY 'pwd-123';
+GRANT ALL ON sa_db TO u2 IDENTIFIED BY "pwd-321";
+SET PASSWORD 
+# comment
+FOR u1 = PASSWORD('pwd 098');
+SET PASSWORD FOR u1=<secret>;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '<secret>' at line 1
+CREATE USER u3 IDENTIFIED BY '';
+drop user u1, u2, u3;
+select 2;
+2
+2
+(select 2);
+2
+2
+/*! select 2*/;
+2
+2
+/*comment*/ select 2;
+2
+2
+drop table t1;
+UPDATE mysql.server_audit_users SET filtername= 'dml_no_select' where host='%' and user='root';
+SET GLOBAL server_audit_reload_filters=ON;
+create table t1(id int);
+insert into t1 values (1), (2);
+select * from t1;
+id
+1
+2
+select 2;
+2
+2
+drop table t1;
+set global server_audit_logging= off;
+set global server_audit_logging= on;
+UPDATE mysql.server_audit_users SET filtername= 'log_all' where host='%' and user='root';
+SET GLOBAL server_audit_reload_filters=ON;
+set global server_audit_query_log_limit= 15;
+select (1), (2), (3), (4);
+1	2	3	4
+1	2	3	4
+select 'A', 'B', 'C', 'D';
+A	B	C	D
+A	B	C	D
+set global server_audit_query_log_limit= 1024;
+CREATE  TABLE t1 (a INT, b VARCHAR(10));
+CREATE  PROCEDURE p1()
+BEGIN
+DECLARE rec ROW TYPE OF t1;
+SELECT rec.c;
+END;$$
+CALL p1();
+ERROR HY000: Row variable 'rec' does not have a field 'c'
+DROP PROCEDURE p1;
+execute immediate "SELECT * FROM t1;";
+a	b
+execute immediate "SELECT * FROM t1;";
+a	b
+DROP TABLE t1;
+drop database sa_db;
+set global server_audit_file_path='.';
+show status like 'server_audit_current_log';
+Variable_name	Value
+Server_audit_current_log	HOME_DIR/server_audit.log
+set global server_audit_file_path='';
+show status like 'server_audit_current_log';
+Variable_name	Value
+Server_audit_current_log	server_audit.log
+set global server_audit_file_path='  ';
+show status like 'server_audit_current_log';
+Variable_name	Value
+Server_audit_current_log	server_audit.log
+set global server_audit_file_path='nonexisting_dir/';
+Warnings:
+Warning	1	SERVER AUDIT plugin can't create file 'nonexisting_dir/'.
+show status like 'server_audit_current_log';
+Variable_name	Value
+Server_audit_current_log	server_audit.log
+show variables like 'server_audit%';
+Variable_name	Value
+server_audit_file_path	  
+server_audit_file_rotate_now	OFF
+server_audit_file_rotate_size	1000000
+server_audit_file_rotations	9
+server_audit_logging	ON
+server_audit_mode	0
+server_audit_output_type	file
+server_audit_query_log_limit	1024
+server_audit_reload_filters	OFF
+server_audit_syslog_facility	LOG_USER
+server_audit_syslog_ident	mysql-server_auditing
+server_audit_syslog_info	
+server_audit_syslog_priority	LOG_INFO
+uninstall plugin server_audit;
+Warnings:
+Warning	1620	Plugin is busy and will be uninstalled on shutdown
+truncate mysql.server_audit_filters;
+truncate mysql.server_audit_users;
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_path=server_audit.log,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,rotate_size=1000000,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_rotations=9,0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,test,logging=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'set global server_audit_logging=on',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'SHOW GLOBAL STATUS LIKE "server_audit%"',0
+TIME,HOSTNAME,root,localhost,ID,0,CONNECT,mysql,,0
+TIME,HOSTNAME,root,localhost,ID,0,DISCONNECT,mysql,,0
+TIME,HOSTNAME,no_such_user,localhost,ID,0,FAILED_CONNECT,,,ID
+TIME,HOSTNAME,no_such_user,localhost,ID,0,DISCONNECT,,,0
+TIME,HOSTNAME,root,localhost,ID,ID,CREATE,test,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'create table t1 (id int)',0
+TIME,HOSTNAME,root,localhost,ID,ID,CREATE,test,t2,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'create table t2 (id int)',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,test,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'insert into t1 values (1), (2)',0
+TIME,HOSTNAME,root,localhost,ID,ID,READ,test,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'select * from t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,test,t2,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'insert into t2 values (1), (2)',0
+TIME,HOSTNAME,root,localhost,ID,ID,READ,test,t2,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'select * from t2',0
+TIME,HOSTNAME,root,localhost,ID,ID,ALTER,test,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,RENAME,test,t1|test.renamed_t1,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'alter table t1 rename renamed_t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'select 1,\n2,\n# comment\n3',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,test,t2,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'insert into t2 values (1), (2)',0
+TIME,HOSTNAME,root,localhost,ID,ID,READ,test,t2,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'select * from t2',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'select * from t_doesnt_exist',ID
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'syntax_error_query',ID
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,DROP,test,renamed_t1,
+TIME,HOSTNAME,root,localhost,ID,ID,DROP,test,t2,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'drop table renamed_t1, t2',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'show variables like \'server_audit%\'',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'create database sa_db',0
+TIME,HOSTNAME,root,localhost,ID,0,CONNECT,test,,0
+TIME,HOSTNAME,root,localhost,ID,ID,CREATE,test,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'create table t1 (id2 int)',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,test,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'insert into t1 values (1), (2)',0
+TIME,HOSTNAME,root,localhost,ID,ID,READ,test,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'select * from t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,DROP,test,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'drop table t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'use sa_db',0
+TIME,HOSTNAME,root,localhost,ID,ID,CREATE,sa_db,sa_t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'create table sa_t1(id int)',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,sa_db,sa_t1,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'insert into sa_t1 values (1), (2)',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,DROP,sa_db,sa_t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'drop table sa_t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,proc,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,proc,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,event,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'drop database sa_db',0
+TIME,HOSTNAME,root,localhost,ID,0,DISCONNECT,,,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'create database sa_db',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'use sa_db',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,db,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,tables_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,columns_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,procs_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,proxies_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,roles_mapping,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,global_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'CREATE USER u1 IDENTIFIED BY *****',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,tables_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,global_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'GRANT ALL ON sa_db TO u2 IDENTIFIED BY *****',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,global_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'SET PASSWORD FOR u1 = PASSWORD(*****)',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,db,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,tables_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,columns_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,procs_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,proxies_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,roles_mapping,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,global_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'CREATE USER u3 IDENTIFIED BY *****',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,db,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,tables_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,columns_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,procs_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,proxies_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,roles_mapping,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,global_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'drop user u1, u2, u3',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_filters,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'INSERT INTO mysql.server_audit_filters VALUES (\'log_all\',\'{}\')',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_filters,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'INSERT INTO mysql.server_audit_filters VALUES (\'query_ddl\',\'{"query_event" : "DDL"}\')',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_filters,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'INSERT INTO mysql.server_audit_filters VALUES (\'query_dcl\',\'{"query_event" : "DCL"}\')',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_filters,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'INSERT INTO mysql.server_audit_filters VALUES (\'query_dml\',\'{"query_event" : "DML"}\')',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_filters,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'INSERT INTO mysql.server_audit_filters VALUES (\'dml_no_select\',\'{"query_event" : "DML_NO_SELECT"}\')',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_filters,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'INSERT INTO mysql.server_audit_filters VALUES (\'ddl_dml\',\'{"query_event" : ["DDL", "DML"]}\')',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_users,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'INSERT INTO mysql.server_audit_users VALUES (\'%\',\'root\',\'query_ddl\')',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'create table t1(id int)',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'drop table t1',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'create table t1(id int)',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'insert into t1 values (1), (2)',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'select * from t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'select 2',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'drop table t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'UPDATE mysql.server_audit_users SET filtername= \'query_dml\' where host=\'%\' and user=\'root\'',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'insert into t1 values (1), (2)',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'select * from t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'select 2',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'(select 2)',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'/*! select 2*/',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'/*comment*/ select 2',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'UPDATE mysql.server_audit_users SET filtername= \'query_dcl\' where host=\'%\' and user=\'root\'',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'CREATE USER u1 IDENTIFIED BY *****',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'GRANT ALL ON sa_db TO u2 IDENTIFIED BY *****',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'SET PASSWORD \n# comment\nFOR u1 = PASSWORD(*****)',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'SET PASSWORD FOR u1=<secret>',ID
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'CREATE USER u3 IDENTIFIED BY *****',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'drop user u1, u2, u3',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'insert into t1 values (1), (2)',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,logging=OFF,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_path=server_audit.log,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,rotate_size=1000000,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_rotations=9,0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,logging=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'UPDATE mysql.server_audit_users SET filtername= \'log_all\' where host=\'%\' and user=\'root\'',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'SET GLOBAL server_audit_reload_filters=ON',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,query_log_Limit=15,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'set global serv',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'select (1), (2)',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'select \'A\', ',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,query_log_Limit=1024,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'set global server_audit_query_log_limit= 1024',0
+TIME,HOSTNAME,root,localhost,ID,ID,CREATE,sa_db,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'CREATE  TABLE t1 (a INT, b VARCHAR(10))',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,proc,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'CREATE  PROCEDURE p1()\nBEGIN\nDECLARE rec ROW TYPE OF t1;\nSELECT rec.c;\nEND',0
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,proc,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'CALL p1()',ID
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,proc,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,db,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,tables_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,columns_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,procs_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,proxies_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,roles_mapping,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,global_priv,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'DROP PROCEDURE p1',0
+TIME,HOSTNAME,root,localhost,ID,ID,READ,sa_db,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'execute immediate "SELECT * FROM t1;"',0
+TIME,HOSTNAME,root,localhost,ID,ID,READ,sa_db,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'execute immediate "SELECT * FROM t1;"',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,table_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,column_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,index_stats,
+TIME,HOSTNAME,root,localhost,ID,ID,DROP,sa_db,t1,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'DROP TABLE t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,proc,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,proc,
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,event,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'drop database sa_db',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,,file_path=.,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_path=.,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,rotate_size=1000000,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_rotations=9,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'set global server_audit_file_path=\'.\'',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'show status like \'server_audit_current_log\'',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,,file_path=,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_path=,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,rotate_size=1000000,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_rotations=9,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'set global server_audit_file_path=\'\'',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'show status like \'server_audit_current_log\'',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,,file_path=  ,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_path=  ,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,rotate_size=1000000,0
+TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_rotations=9,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'set global server_audit_file_path=\'  \'',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'show status like \'server_audit_current_log\'',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,,file_path=nonexisting_dir/,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'set global server_audit_file_path=\'nonexisting_dir/\'',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'SHOW WARNINGS',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'show status like \'server_audit_current_log\'',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'show variables like \'server_audit%\'',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,plugin,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,,'uninstall plugin server_audit',0

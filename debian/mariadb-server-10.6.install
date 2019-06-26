@@ -58,6 +58,7 @@ usr/lib/mysql/plugin/metadata_lock_info.so
 usr/share/mysql/not_supported/query_cache_info.so
 usr/lib/mysql/plugin/query_response_time.so
 usr/lib/mysql/plugin/server_audit.so
+usr/lib/mysql/plugin/server_audit2.so
 usr/lib/mysql/plugin/simple_password_check.so
 usr/lib/mysql/plugin/sql_errlog.so
 usr/share/mysql/not_supported/wsrep_info.so

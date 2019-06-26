@@ -2843,6 +2843,7 @@ void mysql_sql_stmt_execute_immediate(THD *thd)
   LEX *lex= thd->lex;
   Prepared_statement *stmt;
   LEX_CSTRING query;
+  CSET_STRING old_query;
   DBUG_ENTER("mysql_sql_stmt_execute_immediate");
 
   if (lex->prepared_stmt.params_fix_fields(thd))
@@ -2864,6 +2865,7 @@ void mysql_sql_stmt_execute_immediate(THD *thd)
   // See comments on thd->free_list in mysql_sql_stmt_execute()
   Item *free_list_backup= thd->free_list;
   thd->free_list= NULL;
+  old_query= thd->query_string;
   /*
     Make sure we call Prepared_statement::execute_immediate()
     with an empty THD::change_list. It can be non empty as the above
@@ -2888,6 +2890,7 @@ void mysql_sql_stmt_execute_immediate(THD *thd)
   change_list_savepoint.rollback(thd);
   thd->free_items();
   thd->free_list= free_list_backup;
+  thd->set_query_inner(old_query);
 
   stmt->lex->restore_set_statement_var();
   delete stmt;

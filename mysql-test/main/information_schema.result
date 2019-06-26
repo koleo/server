@@ -109,6 +109,8 @@ proc
 procs_priv
 proxies_priv
 roles_mapping
+server_audit_filters
+server_audit_users
 servers
 slow_log
 t1
@@ -883,6 +885,7 @@ information_schema	TRIGGERS	ACTION_CONDITION
 information_schema	TRIGGERS	ACTION_STATEMENT
 information_schema	VIEWS	VIEW_DEFINITION
 mysql	global_priv	Priv
+mysql	server_audit_filters	rule
 mysql	user	Password
 mysql	user	ssl_cipher
 mysql	user	x509_issuer
