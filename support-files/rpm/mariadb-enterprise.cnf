@@ -20,7 +20,7 @@ disable-s3
 plugin-maturity=gamma
 
 # -- Auditing - pre-load Plugin
-plugin-load-add=server_audit
+plugin-load-add=server_audit2
 server_audit=FORCE_PLUS_PERMANENT
 server_audit_logging=OFF
 plugin-load-add=disks
