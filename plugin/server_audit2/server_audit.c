@@ -2287,10 +2287,25 @@ void auditing(MYSQL_THD thd, unsigned int event_class, const void *ev)
     cn->db= event->database;
     cn->user= event->user;
     cn->user_len= event->user_length;
+    if (!cn->user)
+    {
+      cn->user= "";
+      cn->user_len= 0;
+    }
     cn->host= event->host;
     cn->host_len= event->host_length;
+    if (!cn->host)
+    {
+      cn->host= "";
+      cn->host_len= 0;
+    }
     cn->ip= event->ip;
     cn->ip_len= event->ip_length;
+    if (!cn->ip)
+    {
+      cn->ip= "";
+      cn->ip_len= 0;
+    }
     cn->event_type= EVENT_CONNECT;
     cn->event_subclass= (int) event->event_subclass;
     cn->error_code= event->status;
