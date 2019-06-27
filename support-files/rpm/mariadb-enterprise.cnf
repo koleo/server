@@ -18,7 +18,7 @@
 plugin-maturity=gamma
 
 # -- Auditing - pre-load Plugin
-plugin-load-add=server_audit2
+plugin-load-add=server_audit
 server_audit=FORCE_PLUS_PERMANENT
 server_audit_logging=OFF
 plugin-load-add=disks
@@ -28,6 +28,11 @@ plugin-load-add=auth_ed25519
 
 # --Enable simple_password_check
 plugin-load-add=simple_password_check
+
+simple_password_check_minimal_length = 8
+simple_password_check_digits = 1
+simple_password_check_letters_same_case = 1
+simple_password_check_other_characters = 1
 
 [mysql]
 
