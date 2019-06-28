@@ -253,6 +253,7 @@ cannot_find_file()
 # Ok, let's go.  We first need to parse arguments which are required by
 # my_print_defaults so that we can execute it first, then later re-parse
 # the command line to add any extra bits that we need.
+parse_arguments --skip-test-db
 parse_arguments "$@"
 
 #
