@@ -464,6 +464,9 @@
             Value="utf8" />
       </Component>
 
+      <!-- Enterprise plugin load etc -->
+      @MY_INI_VARS@
+
       <!-- Shortcuts in program menu (mysql client etc) -->
       <Component Id="c.shortcuts" Guid="*" Directory="ShortcutFolder">
         <!-- shortcut to my.ini-->

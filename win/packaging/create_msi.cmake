@@ -355,6 +355,42 @@ ENDFOREACH()
 
 CONFIGURE_FILE(${SRCDIR}/mysql_server.wxs.in
  ${CMAKE_CURRENT_BINARY_DIR}/mysql_server.wxs)
+
+# my.ini stuff, eventually might parse enterprise.cnf
+SET(all_ini_vars
+  plugin_maturity=gamma
+  "plugin_load=&quot#server_audit#auth_ed25519#simple_password_check&quot#"
+  server_audit=FORCE_PLUS_PERMANENT
+  server_audit_logging=OFF
+  simple_password_check_minimal_length=8
+  simple_password_check_digits=1
+  simple_password_check_letters_same_case=1
+  simple_password_check_other_characters=1
+)
+
+SET(MY_INI_VARS)
+FOREACH(s ${all_ini_vars})
+  STRING(REPLACE "=" ";" lst ${s})
+  LIST(GET lst 0 var)
+  LIST(GET lst 1 val)
+  STRING(REPLACE "#" ";" val ${val})
+  STRING(APPEND MY_INI_VARS
+  "
+  <Component Id='C.my_ini.${var}' Guid='*' Directory='DATADIR'>
+    <RegistryValue Root='HKLM'
+         Key='SOFTWARE\\${CPACK_WIX_PACKAGE_NAME}'
+         Name='${var}' Value='1' Type='string' KeyPath='yes'/>
+      <IniFile Id='Ini.${var}'
+         Action='createLine'
+         Directory='DATADIR'
+         Section='mysqld'
+         Name='my.ini'
+         Key='${var}'
+         Value='${val}'/>
+  </Component>
+  ")
+ENDFOREACH()
+
 CONFIGURE_FILE(${SRCDIR}/extra.wxs.in
   ${CMAKE_CURRENT_BINARY_DIR}/extra.wxs)
 
