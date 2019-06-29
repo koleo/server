@@ -2490,6 +2490,8 @@ static int server_audit_init(void *p __attribute__((unused)))
 #endif
   flogger_mutex_init(key_LOCK_operations, &lock_operations, MY_MUTEX_INIT_FAST);
   flogger_mutex_init(key_LOCK_operations, &lock_bigbuffer, MY_MUTEX_INIT_FAST);
+  flogger_mutex_init(key_LOCK_atomic, &lock_atomic, MY_MUTEX_INIT_FAST);
+
 
   error_header();
   fprintf(stderr, "MariaDB Audit Plugin version %s%s STARTED.\n",
@@ -2555,6 +2557,7 @@ static int server_audit_deinit(void *p __attribute__((unused)))
   (void) free(big_buffer);
   flogger_mutex_destroy(&lock_operations);
   flogger_mutex_destroy(&lock_bigbuffer);
+  flogger_mutex_destroy(&lock_atomic);
 
   error_header();
   fprintf(stderr, "STOPPED\n");
