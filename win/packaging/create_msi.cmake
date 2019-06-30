@@ -359,7 +359,7 @@ CONFIGURE_FILE(${SRCDIR}/mysql_server.wxs.in
 # my.ini stuff, eventually might parse enterprise.cnf
 SET(all_ini_vars
   plugin_maturity=gamma
-  "plugin_load=&quot#server_audit#auth_ed25519#simple_password_check&quot#"
+  "plugin_load=&quot#server_audit2#auth_ed25519#simple_password_check&quot#"
   server_audit=FORCE_PLUS_PERMANENT
   server_audit_logging=OFF
   simple_password_check_minimal_length=8
