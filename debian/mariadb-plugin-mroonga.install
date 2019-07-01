@@ -1,4 +1,4 @@
-usr/share/mysql/not_supported/ha_mroonga.so usr/lib/mysql/plugin/ha_mroonga.so
+usr/share/mysql/not_supported/ha_mroonga.so usr/lib/mysql/plugin
 usr/share/mysql/mroonga/AUTHORS
 usr/share/mysql/mroonga/COPYING
 usr/share/mysql/mroonga/install.sql
