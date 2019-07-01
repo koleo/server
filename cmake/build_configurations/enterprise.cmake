@@ -30,13 +30,12 @@ IF(SIZEOF_VOIDP EQUAL 8)
 ENDIF()
 
 # MENT-2 Binary information
-OPTION(BUILD_CONFIG_ENTERPRISE "MariaDB Enterprise is being built" ON)
 SET(COMPILATION_COMMENT "MariaDB Enterprise Server")
 SET(MYSQL_SERVER_SUFFIX "-enterprise")
-SET(CPACK_RPM_PACKAGE_URL "http://mariadb.com")
+SET(CPACK_PACKAGE_URL "http://mariadb.com")
 SET(CPACK_PACKAGE_CONTACT "MariaDB Corporation <info@mariadb.com>")
 SET(CPACK_PACKAGE_VENDOR "MariaDB Corporation")
-SET(CPACK_RPM_PACKAGE_DESCRIPTION "MariaDB Enterprise Server: a very fast and robust SQL database server.
+SET(CPACK_PACKAGE_DESCRIPTION "MariaDB Enterprise Server: a very fast and robust SQL database server.
   MariaDB documentation can be found at https://mariadb.com/kb/en/
   MariaDB bug reports should be submitted through https://support.mariadb.com/")
 
