@@ -987,7 +987,7 @@ static struct filter_cond *make_cond(enum filter_cond_func cfunc,
     {
       struct filter_cond *cf;
       cfunc= find_cond_func(keyname, keyname_end - keyname);
-      if (f->func == COND_ERROR)
+      if (cfunc == COND_ERROR)
       {
         error_header();
         fprintf(stderr, "Unknown filter function %.*s.\n",
@@ -1003,8 +1003,8 @@ static struct filter_cond *make_cond(enum filter_cond_func cfunc,
       *arg_hook= cf;
       arg_hook= &cf->next;
 
-    } while (json_get_object_nkey(def, def_end, nkey++,
-               &keyname, &keyname_end, &v, &v_len) != JSV_NOTHING);
+    } while ((vt= json_get_object_nkey(def, def_end, nkey++,
+                    &keyname, &keyname_end, &v, &v_len)) != JSV_NOTHING);
 
     *arg_hook= 0;
     break;

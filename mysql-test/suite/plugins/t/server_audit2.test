@@ -193,6 +193,19 @@ execute immediate "SELECT * FROM t1;";
 
 DROP TABLE t1;
 
+#
+# MENT-239 AUDIT can't load filters if we define the rule, that consists of array and single value in json
+#
+INSERT INTO mysql.server_audit_filters VALUES ('f_ment_239', '{"connect_event": "DISCONNECT", "table_event": ["WRITE", "READ"]}');
+UPDATE mysql.server_audit_users SET filtername= 'f_ment_239' where host='%' and user='root';
+
+SET GLOBAL server_audit_reload_filters=ON;
+SHOW STATUS LIKE "Server_audit_session_filter";
+
+UPDATE mysql.server_audit_users SET filtername= 'log_all' where host='%' and user='root';
+SET GLOBAL server_audit_reload_filters=ON;
+SHOW STATUS LIKE "Server_audit_session_filter";
+
 drop database sa_db;
 
 set global server_audit_file_path='.';

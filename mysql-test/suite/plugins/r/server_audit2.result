@@ -240,6 +240,17 @@ a	b
 execute immediate "SELECT * FROM t1;";
 a	b
 DROP TABLE t1;
+INSERT INTO mysql.server_audit_filters VALUES ('f_ment_239', '{"connect_event": "DISCONNECT", "table_event": ["WRITE", "READ"]}');
+UPDATE mysql.server_audit_users SET filtername= 'f_ment_239' where host='%' and user='root';
+SET GLOBAL server_audit_reload_filters=ON;
+SHOW STATUS LIKE "Server_audit_session_filter";
+Variable_name	Value
+Server_audit_session_filter	f_ment_239
+UPDATE mysql.server_audit_users SET filtername= 'log_all' where host='%' and user='root';
+SET GLOBAL server_audit_reload_filters=ON;
+SHOW STATUS LIKE "Server_audit_session_filter";
+Variable_name	Value
+Server_audit_session_filter	log_all
 drop database sa_db;
 set global server_audit_file_path='.';
 show status like 'server_audit_current_log';
@@ -477,6 +488,15 @@ TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,column_stats,
 TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,index_stats,
 TIME,HOSTNAME,root,localhost,ID,ID,DROP,sa_db,t1,
 TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'DROP TABLE t1',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_filters,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'INSERT INTO mysql.server_audit_filters VALUES (\'f_ment_239\', \'{"connect_event": "DISCONNECT", "table_event": ["WRITE", "READ"]}\')',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_users,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'UPDATE mysql.server_audit_users SET filtername= \'f_ment_239\' where host=\'%\' and user=\'root\'',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_users,
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,sa_db,reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'SET GLOBAL server_audit_reload_filters=ON',0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,sa_db,'SHOW STATUS LIKE "Server_audit_session_filter"',0
 TIME,HOSTNAME,root,localhost,ID,ID,READ,mysql,proc,
 TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,proc,
 TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,event,
