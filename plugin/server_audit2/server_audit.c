@@ -1193,20 +1193,10 @@ static void log_start_file()
 #define S_ISDIR(x) ((x) & _S_IFDIR)
 #endif /*__WIN__ && !S_ISDIR*/
 
-static int start_logging(MYSQL_THD thd, int reload_filters)
+static int start_logging(MYSQL_THD thd)
 {
-  int result= 0;
-
   last_error_buf[0]= 0;
   log_write_failures= 0;
-  if (reload_filters && (result= load_filters()))
-  {
-    error_header();
-    fprintf(stderr, "Filters aren't loaded, logging can't be enabled!.\n");
-
-    logging= 0;
-    return result;
-  }
 
   if (output_type == OUTPUT_FILE)
   {
@@ -2519,12 +2509,13 @@ static int server_audit_init(void *p __attribute__((unused)))
   if (logging)
   {
     ADD_ATOMIC(internal_stop_logging, 1);
-    start_logging(0, 1);
+    if (load_filters())
+    {
+      error_header();
+      fprintf(stderr, "Filters aren't loaded, logging everything.\n");
+    }
+    start_logging(0);
     ADD_ATOMIC(internal_stop_logging, -1);
-  }
-  else
-  {
-    (void) load_filters();
   }
 
   init_done= 1;
@@ -2677,12 +2668,12 @@ static void update_file_path(MYSQL_THD thd,
 
     file_path= new_name;
     stop_logging();
-    if (start_logging(thd, 0))
+    if (start_logging(thd))
     {
       file_path= sav_path;
       error_header();
       fprintf(stderr, "Reverting log filename back to '%s'.\n", file_path);
-      logging= (start_logging(thd, 0) == 0);
+      logging= (start_logging(thd) == 0);
       if (!logging)
       {
         error_header();
@@ -2775,7 +2766,7 @@ static void update_output_type(MYSQL_THD thd,
           output_type_names[output_type]);
 
   if (logging)
-    start_logging(thd, 0);
+    start_logging(thd);
   flogger_mutex_unlock(&lock_operations);
   ADD_ATOMIC(internal_stop_logging, -1);
 }
@@ -2828,7 +2819,16 @@ static void update_logging(MYSQL_THD thd,
   log_config(thd, "logging", "OFF");
   if ((logging= new_logging))
   {
-    start_logging(thd, 1);
+    if (load_filters())
+    {
+      error_header();
+      fprintf(stderr, "Filters aren't loaded, logging can't be enabled!.\n");
+
+      logging= 0;
+    }
+    else
+      start_logging(thd);
+
     if (!logging)
     {
       CLIENT_ERROR(1, "Logging cannot be enabled.", MYF(ME_FATAL));
@@ -2883,7 +2883,7 @@ static void update_syslog_ident(MYSQL_THD thd  __attribute__((unused)),
   if (logging && output_type == OUTPUT_SYSLOG)
   {
     stop_logging();
-    start_logging(thd, 0);
+    start_logging(thd);
   }
   flogger_mutex_unlock(&lock_operations);
   ADD_ATOMIC(internal_stop_logging, -1);
