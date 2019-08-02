@@ -27,6 +27,7 @@ plugin-load-add=disks
 
 # -- Enable ed25519 authentication
 plugin-load-add=auth_ed25519
+innodb-adaptive-hash-index=OFF
 
 # --Enable simple_password_check
 plugin-load-add=simple_password_check
