@@ -76,12 +76,7 @@ MACRO(MYSQL_ADD_PLUGIN)
       SET(compat "with${compat}")
     ENDIF()
 
-    # check if plugin is on the list of the plugins that shouldn't be compiled
-    LIST (FIND PLUGINS_DONT_COMPILE ${plugin} _index)
-
-    IF (${_index} GREATER -1)
-      SET(howtobuild NO)
-    ELSEIF (ARG_DISABLED)
+    IF (ARG_DISABLED)
       SET(howtobuild NO)
     ELSEIF (compat STREQUAL ".")
       SET(howtobuild DYNAMIC)

@@ -45,8 +45,8 @@ ENDIF()
 
 SET(PLUGIN_S3 STATIC CACHE STRING "")
 
-# Don't compile the following plugins
-SET(PLUGINS_DONT_COMPILE "SPHINX" "TOKUDB")
+SET(PLUGIN_SPHINX NO CACHE STRING "")
+SET(PLUGIN_TOKUDB NO CACHE STRING "")
 
 # MENT-4 Place not supported plugins in a separate dir
 SET(PLUGINS_NOT_SUPPORTED
