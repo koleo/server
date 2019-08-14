@@ -29,6 +29,8 @@ plugin-load-add=disks
 plugin-load-add=auth_ed25519
 # -- The adaptive hash index can *hurt* performance or cause corruption
 loose-skip-innodb-adaptive-hash-index
+# Work around MDEV-19348. Also, should improve backup performance (MDEV-19747).
+loose-skip-innodb-log-optimize-ddl
 
 # --Enable simple_password_check
 plugin-load-add=simple_password_check
