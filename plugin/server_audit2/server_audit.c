@@ -15,7 +15,7 @@
 
 
 #define PLUGIN_VERSION 0x201
-#define PLUGIN_STR_VERSION "2.0.1"
+#define PLUGIN_STR_VERSION "2.0.2"
 
 #define _my_thread_var loc_thread_var
 
@@ -2163,13 +2163,13 @@ static int log_rename(struct connection_info *cn,
   return write_log(message, csize + 1, 0);
 }
 
-static int event_query_command(MYSQL_THD thd)
+static int event_query_command(MYSQL_THD thd, int error_code)
 {
   enum enum_server_command cmd= thd_current_command(thd);
 
   return cmd == COM_QUERY ||
          cmd == COM_STMT_EXECUTE ||
-         cmd == COM_STMT_PREPARE;
+         (error_code != 0 && cmd == COM_STMT_PREPARE);
 }
 
 
@@ -2199,7 +2199,7 @@ void auditing(MYSQL_THD thd, unsigned int event_class, const void *ev)
       Only one subclass is logged.
     */
     if (event->event_subclass == MYSQL_AUDIT_GENERAL_STATUS &&
-        event_query_command(thd))
+        event_query_command(thd, event->general_error_code))
     {
       cn->thd= thd;
       cn->db= event->database;
@@ -2208,6 +2208,15 @@ void auditing(MYSQL_THD thd, unsigned int event_class, const void *ev)
       setc(thd_client_ip(thd), &cn->ip, &cn->ip_len);
       cn->query= event->general_query;
       cn->query_len= event->general_query_length;
+      if (cn->query == 0)
+      {
+#ifdef DBUG_OFF
+        /* cn->query can only be 0 in extreme errors like OUT-OF-MEMORY */
+        /* so don't fix it for the DEBUG version. */
+        cn->query= "";
+#endif /*DBUG_OFF*/
+        cn->query_len= 0;
+      }
       cn->query_time= event->general_time;
       cn->event_type= EVENT_QUERY;
       cn->event_subclass= -1;
