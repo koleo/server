@@ -1560,7 +1560,7 @@ do_log_query:
       {
         if (filter_query_type(query, dml_keywords) &&
             !filter_query_type(query, dml_no_select_keywords))
-          goto do_log_query;
+          goto do_log_query_2;
       }
       if (c->mask & QUERY_OPT_DCL)
       {
