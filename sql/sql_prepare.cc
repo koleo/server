@@ -5191,7 +5191,7 @@ public:
 
   Protocol_local(THD *thd_arg, ulong prealloc= 0) :
     Protocol_text(thd_arg, prealloc),
-      cur_data(0), first_data(0), data_tail(&first_data)
+      cur_data(0), first_data(0), data_tail(&first_data), alloc(0)
     {}
  
 protected:
