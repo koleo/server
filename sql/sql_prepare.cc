@@ -2761,6 +2761,7 @@ bool Lex_prepared_stmt::get_dynamic_sql_string(THD *thd,
 void mysql_sql_stmt_prepare(THD *thd)
 {
   LEX *lex= thd->lex;
+  CSET_STRING orig_query= thd->query_string;
   const LEX_CSTRING *name= &lex->prepared_stmt.name();
   Prepared_statement *stmt;
   LEX_CSTRING query;
@@ -2843,6 +2844,14 @@ void mysql_sql_stmt_prepare(THD *thd)
   }
   change_list_savepoint.rollback(thd);
 
+  /*
+     stmt->prepare() sets thd->query_string with the prepared
+     query, so the audit plugin gets adequate notification with the
+     mysqld_stmt_* set of functions.
+     But here we should restore the original query so it's mentioned in
+     logs properly.
+   */
+  thd->set_query_inner(orig_query);
   DBUG_VOID_RETURN;
 }
 
@@ -2850,6 +2859,7 @@ void mysql_sql_stmt_prepare(THD *thd)
 void mysql_sql_stmt_execute_immediate(THD *thd)
 {
   LEX *lex= thd->lex;
+  CSET_STRING orig_query= thd->query_string;
   Prepared_statement *stmt;
   LEX_CSTRING query;
   CSET_STRING old_query;
@@ -2902,6 +2912,14 @@ void mysql_sql_stmt_execute_immediate(THD *thd)
   thd->set_query_inner(old_query);
 
   stmt->lex->restore_set_statement_var();
+  /*
+    stmt->execute_immediately() sets thd->query_string with the executed
+    query, so the audit plugin gets adequate notification with the
+    mysqld_stmt_* set of functions.
+    But here we should restore the original query so it's mentioned in
+    logs properly.
+  */
+  thd->set_query_inner(orig_query);
   delete stmt;
   DBUG_VOID_RETURN;
 }
