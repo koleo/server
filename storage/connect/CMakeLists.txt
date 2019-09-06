@@ -386,7 +386,7 @@ IF(WIN32)
 # Install some extra files that belong to connect engine
 
   INSTALL(FILES "$<TARGET_FILE_DIR:connect>/ha_connect.lib"
-    DESTINATION ${INSTALL_PLUGINDIR} COMPONENT connect-engine)
+    DESTINATION ${INSTALL_MYSQLSHAREDIR}/not_supported  COMPONENT connect-engine)
 ENDIF(WIN32)
 
 IF(MSVC)
