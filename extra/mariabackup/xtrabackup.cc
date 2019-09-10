@@ -74,6 +74,7 @@ Street, Fifth Floor, Boston, MA 02110-1335 USA
 #include "trx0sys.h"
 #include <buf0dblwr.h>
 #include "ha_innodb.h"
+#include "fts0types.h"
 
 #include <list>
 #include <sstream>
@@ -112,6 +113,9 @@ Street, Fifth Floor, Boston, MA 02110-1335 USA
 #include "sql_table.h"
 
 int sys_var_init();
+
+extern const char* fts_common_tables[];
+extern const  fts_index_selector_t fts_index_selector[];
 
 /* === xtrabackup specific options === */
 char xtrabackup_real_target_dir[FN_REFLEN] = "./xtrabackup_backupfiles/";
@@ -622,7 +626,6 @@ struct dbug_thread_param_t
 	const char *query;
 	int expect_err;
 	int expect_errno;
-	os_event_t done_event;
 };
 
 
@@ -649,10 +652,8 @@ DECLARE_THREAD(dbug_execute_in_new_connection)(void *arg)
 	}
 	mysql_close(par->con);
 	mysql_thread_end();
-	os_event_t done = par->done_event;
 	delete par;
-	os_event_set(done);
-	os_thread_exit();
+	os_thread_exit(false);
 	return os_thread_ret_t(0);
 }
 
@@ -667,7 +668,7 @@ Execute query from a new connection, in own thread.
 @param expected_errno - if not 0, and query finished with error,
 	expected mysql_errno()
 */
-static os_event_t dbug_start_query_thread(
+static os_thread_t dbug_start_query_thread(
 	const char *query,
 	const char *wait_state,
 	int expected_err,
@@ -678,12 +679,14 @@ static os_event_t dbug_start_query_thread(
 	par->query = query;
 	par->expect_err = expected_err;
 	par->expect_errno = expected_errno;
-	par->done_event = os_event_create(0);
 	par->con =  xb_mysql_connect();
-	os_thread_create(dbug_execute_in_new_connection, par, 0);
+	if (mysql_set_server_option(par->con, MYSQL_OPTION_MULTI_STATEMENTS_ON))
+		die("Can't set multistatement option for query: %s", query);
+	os_thread_t os_thread_id =
+		os_thread_create(dbug_execute_in_new_connection, par, 0);
 
 	if (!wait_state)
-		return par->done_event;
+		return os_thread_id;
 
 	char q[256];
 	snprintf(q, sizeof(q),
@@ -705,10 +708,11 @@ static os_event_t dbug_start_query_thread(
 end:
 	msg("query '%s' on connection %lu reached state '%s'", query,
 	mysql_thread_id(par->con), wait_state);
-	return par->done_event;
+	return os_thread_id;
 }
 
-os_event_t dbug_alter_thread_done;
+os_thread_t dbug_alter_thread;
+os_thread_t dbug_emulate_ddl_on_intermediate_table_thread;
 #endif
 
 void mdl_lock_all()
@@ -787,6 +791,31 @@ static void backup_file_op(ulint space_id, bool create,
 	pthread_mutex_unlock(&backup_mutex);
 }
 
+static bool check_if_fts_table(const char *file_name) {
+	const char *table_name_start = strrchr(file_name, OS_PATH_SEPARATOR);
+	if (table_name_start)
+		++table_name_start;
+	else
+		table_name_start = file_name;
+
+	if (!starts_with(table_name_start,"FTS_"))
+		return false;
+
+	const char *table_name_end = strrchr(table_name_start, '.');
+	if (!table_name_end)
+		table_name_end = table_name_start + strlen(table_name_start);
+	ptrdiff_t table_name_len = table_name_end - table_name_end;
+
+	for (const char **suffix = fts_common_tables; *suffix; ++suffix)
+		if (!strncmp(table_name_start, *suffix, table_name_len))
+			return true;
+	for (size_t i = 0; fts_index_selector[i].suffix; ++i)
+		if (!strncmp(table_name_start, fts_index_selector[i].suffix,
+			table_name_len))
+			return true;
+
+	return false;
+}
 
 /*
  This callback is called if DDL operation is detected,
@@ -817,7 +846,11 @@ static void backup_file_op_fail(ulint space_id, bool create,
 	}
 	else {
 		std::string  spacename = filename_to_spacename(name, len);
-		fail = !check_if_skip_table(spacename.c_str());
+		if (check_if_skip_table(spacename.c_str()) ||
+			check_if_fts_table(reinterpret_cast<const char *>(name)))
+			fail = false;
+		else
+			fail = true;
 		msg("DDL tracking : delete %zu \"%.*s\"", space_id, int(len), name);
 	}
 	if (fail) {
@@ -3170,9 +3203,14 @@ xb_load_single_table_tablespace(
 		name[pathlen - 5] = 0;
 	}
 
-	Datafile *file = xb_new_datafile(name, is_remote);
+	auto file = std::unique_ptr<Datafile>(xb_new_datafile(name, is_remote));
 
 	if (file->open_read_only(true) != DB_SUCCESS) {
+		// Ignore FTS tables, as they can be removed for intermediate tables,
+		// this code must be executed under stronger or equal to BLOCK_DDL lock,
+		// so there must not be errors for non-intermediate FTS tables.
+		if (check_if_fts_table(filname))
+			return;
 		die("Can't open datafile %s", name);
 	}
 
@@ -3212,8 +3250,6 @@ xb_load_single_table_tablespace(
 			space->close();
 		}
 	}
-
-	delete file;
 
 	if (err != DB_SUCCESS && xtrabackup_backup && !is_empty_file) {
 		die("Failed to not validate first page of the file %s, error %d",name, (int)err);
@@ -4229,6 +4265,22 @@ class BackupStages {
 				return false;
 			}
 
+			DBUG_EXECUTE_IF("emulate_ddl_on_intermediate_table",
+				dbug_emulate_ddl_on_intermediate_table_thread =
+				dbug_start_query_thread(
+					"SET debug_sync='copy_data_between_tables_after_set_backup_lock "
+					"SIGNAL copy_started';"
+					"SET debug_sync='copy_data_between_tables_before_reset_backup_lock "
+					"SIGNAL before_backup_lock_reset WAIT_FOR backup_lock_reset';"
+					"SET debug_sync='alter_table_after_temp_table_drop "
+					"SIGNAL temp_table_dropped';"
+					"SET SESSION lock_wait_timeout = 1;"
+					"ALTER TABLE test.t1 ADD COLUMN col1_copy INT, ALGORITHM = COPY;",
+					NULL, 0, 0);
+					xb_mysql_query(mysql_connection,
+						"SET debug_sync='now WAIT_FOR copy_started'", false, true);
+				);
+
 			return true;
 		}
 
@@ -4391,9 +4443,13 @@ class BackupStages {
 			}
 			backup_release();
 			DBUG_EXECUTE_IF("check_mdl_lock_works",
-					os_event_wait(dbug_alter_thread_done);
-					os_event_destroy(dbug_alter_thread_done);
+					os_thread_join(dbug_alter_thread);
 					);
+
+			DBUG_EXECUTE_IF("emulate_ddl_on_intermediate_table",
+					os_thread_join(dbug_emulate_ddl_on_intermediate_table_thread);
+					);
+
 			backup_finish();
 			return true;
 		}
@@ -4675,7 +4731,7 @@ fail_before_log_copying_thread_start:
 		mdl_lock_all();
 
 		DBUG_EXECUTE_IF("check_mdl_lock_works",
-			dbug_alter_thread_done =
+			dbug_alter_thread =
 			dbug_start_query_thread("ALTER TABLE test.t ADD COLUMN mdl_lock_column int",
 				"Waiting for table metadata lock", 0, 0););
 	}
@@ -4758,6 +4814,12 @@ void backup_fix_ddl(void)
 	pthread_mutex_unlock(&backup_mutex);
 
 	DBUG_MARIABACKUP_EVENT("backup_fix_ddl",0);
+
+	DBUG_EXECUTE_IF("emulate_ddl_on_intermediate_table",
+			xb_mysql_query(mysql_connection,
+				"SET debug_sync='now SIGNAL backup_lock_reset "
+				"WAIT_FOR temp_table_dropped'", false, true);
+			);
 
 	for (space_id_to_name_t::iterator iter = ddl_tracker.tables_in_backup.begin();
 		iter != ddl_tracker.tables_in_backup.end();

@@ -11195,6 +11195,7 @@ err_new_table_cleanup:
                           (FN_IS_TMP | (no_ha_table ? NO_HA_TABLE : 0)),
                           alter_ctx.get_tmp_path());
 
+  DEBUG_SYNC(thd, "alter_table_after_temp_table_drop");
   DBUG_RETURN(true);
 
 err_with_mdl_after_alter:
@@ -11328,6 +11329,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   }
 
   backup_set_alter_copy_lock(thd, from);
+  DEBUG_SYNC(thd, "copy_data_between_tables_after_set_backup_lock");
 
   alter_table_manage_keys(to, from->file->indexes_are_disabled(), keys_onoff);
 
@@ -11614,6 +11616,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   cleanup_done= 1;
   to->file->extra(HA_EXTRA_NO_IGNORE_DUP_KEY);
 
+  DEBUG_SYNC(thd, "copy_data_between_tables_before_reset_backup_lock");
   if (backup_reset_alter_copy_lock(thd))
     error= 1;
 
