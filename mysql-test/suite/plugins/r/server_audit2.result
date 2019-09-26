@@ -27,12 +27,36 @@ server_audit_syslog_priority	LOG_INFO
 set global server_audit_file_path=null;
 set global server_audit_file_path='server_audit.log';
 set global server_audit_output_type=file;
+rename table mysql.server_audit_users to mysql.server_audit_users_renamed;
 set global server_audit_logging=on;
+ERROR HY000: Can't load data from mysql.server_audit_users. SERVER_AUDIT cannot enable Logging.
+rename table mysql.server_audit_users_renamed to mysql.server_audit_users;
+rename table mysql.server_audit_users to mysql.server_audit_users_renamed;
+set global server_audit_logging=on;
+ERROR HY000: Can't load data from mysql.server_audit_users. SERVER_AUDIT cannot enable Logging.
+rename table mysql.server_audit_users_renamed to mysql.server_audit_users;
+INSERT INTO mysql.server_audit_filters VALUES ('query_ddl','{"query_event" : "DDL"}');
+INSERT INTO mysql.server_audit_filters VALUES ('query_dddl','{"query_event" : "DDDL"}');
+set global server_audit_logging=on;
+ERROR HY000: Unknown option DDDL. Can't parse filter's 'query_dddl' definition {"query_event" : "DDDL"}. SERVER_AUDIT cannot enable Logging.
+truncate mysql.server_audit_filters;
+INSERT INTO mysql.server_audit_filters VALUES ('query_ddl','{"query_event" : "DDL"}');
+INSERT INTO mysql.server_audit_users VALUES ('%','root','query_dddl');
+set global server_audit_logging=on;
+ERROR HY000: Can't find filter 'query_dddl' for user %@root. SERVER_AUDIT cannot enable Logging.
+truncate mysql.server_audit_filters;
+truncate mysql.server_audit_users;
+set global server_audit_logging=on;
+INSERT INTO mysql.server_audit_filters VALUES ('query_dddl','{"query_event" : "DDDL"}');
+SET GLOBAL server_audit_reload_filters=ON;
+ERROR HY000: Unknown option DDDL. Can't parse filter's 'query_dddl' definition {"query_event" : "DDDL"}. SERVER AUDIT can't load filters - old filters are saved.
+truncate mysql.server_audit_filters;
+SET GLOBAL server_audit_reload_filters=ON;
 SHOW GLOBAL STATUS LIKE "server_audit%";
 Variable_name	Value
 Server_audit_active	ON
 Server_audit_current_log	server_audit.log
-Server_audit_last_error	
+Server_audit_last_error	Unknown option DDDL. Can't parse filter's 'query_dddl' definition {"query_event" : "DDDL"}. can't load filters - old filters are saved.
 Server_audit_session_filter	N/A
 Server_audit_writes_failed	0
 connect  con1,localhost,root,,mysql;
@@ -295,6 +319,14 @@ TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,rotate_size=1000000,0
 TIME,HOSTNAME,,,0,0,AUDIT_CONFIG,,file_rotations=9,0
 TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,test,logging=ON,0
 TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'set global server_audit_logging=on',0
+TIME,HOSTNAME,root,localhost,ID,ID,WRITE,mysql,server_audit_filters,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'INSERT INTO mysql.server_audit_filters VALUES (\'query_dddl\',\'{"query_event" : "DDDL"}\')',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,test,failed reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'SET GLOBAL server_audit_reload_filters=ON',ID
+TIME,HOSTNAME,root,localhost,ID,ID,CREATE,mysql,server_audit_filters,
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'truncate mysql.server_audit_filters',0
+TIME,HOSTNAME,root,localhost,ID,0,AUDIT_CONFIG,test,reload_filters=ON,0
+TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'SET GLOBAL server_audit_reload_filters=ON',0
 TIME,HOSTNAME,root,localhost,ID,ID,QUERY,test,'SHOW GLOBAL STATUS LIKE "server_audit%"',0
 TIME,HOSTNAME,root,localhost,ID,0,CONNECT,mysql,,0
 TIME,HOSTNAME,root,localhost,ID,0,DISCONNECT,mysql,,0

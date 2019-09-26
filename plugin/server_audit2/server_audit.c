@@ -569,6 +569,9 @@ static long log_write_failures= 0;
 static char current_log_buf[FN_REFLEN]= "";
 static char last_error_buf[512]= "";
 
+static char err_msg[512]= "";
+static size_t err_len= 0;
+
 static int show_filter(MYSQL_THD thd, struct st_mysql_show_var *var,
                        char *buff, struct system_status_var *sv,
                        enum enum_var_type scope);
@@ -750,6 +753,29 @@ static void error_header()
 }
 
 
+static void explain_error(const char *fmt, ...)
+{
+  size_t len;
+  va_list args;
+
+  if (err_len > 0 && err_len < sizeof(err_msg))
+  {
+    err_msg[err_len++]= ' ';
+  }
+  va_start(args, fmt);
+  len= my_vsnprintf(err_msg + err_len, sizeof(err_msg) - err_len,
+                    fmt, args);
+  va_end(args);
+  
+  error_header();
+  va_start(args, fmt);
+  vfprintf(stderr, fmt, args);
+  va_end(args);
+  fprintf(stderr, "\n");
+  err_len+= len;
+}
+
+
 static LOGGER_HANDLE *logfile;
 
 static struct connection_info *get_loc_info(MYSQL_THD thd)
@@ -772,22 +798,30 @@ extern int execute_sql_command(const char *command,
                                char *hosts, char *names, char *filters);
 
 
-static void free_filters()
+static void free_filters_ex(struct filter_def **filter_list,
+                            struct filter_def **default_filter,
+                            struct user_def **user_list)
 {
-  while (user_list)
+  while (*user_list)
   {
-    struct user_def *tmp= user_list;
-    user_list= user_list->next;
+    struct user_def *tmp= *user_list;
+    *user_list= tmp->next;
     free(tmp);
   }
 
-  while (filter_list)
+  while (*filter_list)
   {
-    struct filter_def *tmp= filter_list;
-    filter_list= filter_list->next;
+    struct filter_def *tmp= *filter_list;
+    *filter_list= tmp->next;
     free(tmp);
   }
-  default_filter= 0;
+  *default_filter= 0;
+}
+
+
+static void free_filters()
+{
+  free_filters_ex(&filter_list, &default_filter, &user_list);
 }
 
 
@@ -966,7 +1000,10 @@ static struct filter_cond *make_cond(enum filter_cond_func cfunc,
       goto ok;
     }
     if (def_type != JSV_OBJECT)
+    {
+      explain_error("Syntax error in filter definition.");
       goto error;
+    }
 
     vt= json_get_object_nkey(def, def_end, 0,
                              &keyname, &keyname_end, &v, &v_len);
@@ -989,9 +1026,8 @@ static struct filter_cond *make_cond(enum filter_cond_func cfunc,
       cfunc= find_cond_func(keyname, keyname_end - keyname);
       if (cfunc == COND_ERROR)
       {
-        error_header();
-        fprintf(stderr, "Unknown filter function %.*s.\n",
-                (int) (keyname_end - keyname), keyname);
+        explain_error("Unknown filter function %.*s.",
+                      (int) (keyname_end - keyname), keyname);
         goto error;
       }
       cf= make_cond(cfunc, vt, v, v + v_len);
@@ -1074,16 +1110,14 @@ static int load_filters()
   int result;
 
   free_filters();
+  err_len= 0;
 
   if ((result= execute_sql_command("select filtername, rule"
                           " from mysql.server_audit_filters",
                           names, filters, 0)))
   {
     if (result != 2)
-    {
-      error_header();
-      fprintf(stderr, "Can't load data from mysql.server_audit_filters.\n");
-    }
+      explain_error("Can't load data from mysql.server_audit_filters.");
     goto error;
   }
 
@@ -1100,11 +1134,10 @@ static int load_filters()
     vt= json_type(c_filter, c_filter_end, &v, &v_len);
     if (!(fc= make_cond(COND_OR, vt, c_filter, c_filter_end)))
     {
-      error_header();
-      fprintf(stderr, "Can't parse filter's '%s' definition %s.\n",
-              c_name, c_filter);
+      explain_error("Can't parse filter's '%s' definition %s.",
+                    c_name, c_filter);
       result= 1;
-      goto cont;
+      goto error;
     }
 
     fd= (struct filter_def *) malloc(sizeof(struct filter_def));
@@ -1115,7 +1148,7 @@ static int load_filters()
 
     if (strcasecmp(c_name, "default") == 0)
       default_filter= fd;
-cont:
+
     c_name+= strlen(c_name)+1;
     c_filter+= strlen(c_filter)+1;
   }
@@ -1126,10 +1159,7 @@ cont:
                           hosts, names, filters)))
   {
     if (result != 2)
-    {
-      error_header();
-      fprintf(stderr, "Can't load data from mysql.server_audit_users.\n");
-    }
+      explain_error("Can't load data from mysql.server_audit_users.");
     goto error;
   }
 
@@ -1158,9 +1188,8 @@ cont:
     u_d->filter= find_filter(c_filter);
     if (!u_d->filter)
     {
-      error_header();
-      fprintf(stderr, "Can't find filter '%s' for user %s@%s.\n",
-              c_filter, c_host, c_name);
+      explain_error("Can't find filter '%s' for user %s@%s.",
+                    c_filter, c_host, c_name);
       result= 1;
       goto error;
     }
@@ -1368,7 +1397,10 @@ static int parse_events(struct option_value *options, enum json_types s_type,
     {
       if ((vt= json_get_array_item(s, s_end, i, &v, &v_len)) ==
           JSV_BAD_JSON)
+      {
+        explain_error("Bad JSON syntax for events.");
         return 1;
+      }
       if (vt == JSV_NOTHING)
         break;
       if (parse_events(options, vt, v, v+v_len, &c_mask))
@@ -1380,7 +1412,10 @@ static int parse_events(struct option_value *options, enum json_types s_type,
   }
 
   if (s_type != JSV_STRING)
+  {
+    explain_error("Events can only be an array or a string.");
     return 1;
+  }
 
   while (s < s_end)
   {
@@ -1403,8 +1438,7 @@ static int parse_events(struct option_value *options, enum json_types s_type,
 
     if (options[i].name == 0) /* Nothing found. */
     {
-      error_header();
-      fprintf(stderr, "Unknown option %s.\n", wd);
+      explain_error("Unknown option %s.", wd);
       return 1;
     }
 
@@ -2520,8 +2554,8 @@ static int server_audit_init(void *p __attribute__((unused)))
     ADD_ATOMIC(internal_stop_logging, 1);
     if (load_filters())
     {
-      error_header();
-      fprintf(stderr, "Filters aren't loaded, logging everything.\n");
+      explain_error("Filters aren't loaded, logging everything.");
+      memcpy(last_error_buf, err_msg, err_len+1);
     }
     start_logging(0);
     ADD_ATOMIC(internal_stop_logging, -1);
@@ -2584,18 +2618,37 @@ static void do_reload_filters(MYSQL_THD thd  __attribute__((unused)),
                               void *var_ptr  __attribute__((unused)),
                               const void *save  __attribute__((unused)))
 {
+  struct filter_def *old_filter_list;
+  struct filter_def *old_default_filter;
+  struct user_def *old_user_list;
+
   ADD_ATOMIC(internal_stop_logging, 1);
   flogger_mutex_lock(&lock_operations);
+
+  old_filter_list= filter_list;
+  old_default_filter= default_filter;
+  old_user_list= user_list;
+
+  filter_list= 0;
+  default_filter= 0;
+  user_list= 0;
 
   if (load_filters())
   {
     log_config(thd, "failed reload_filters", "ON");
-    CLIENT_ERROR(1, "SERVER AUDIT can't load filters - logging everything.", MYF(ME_FATAL));
-    error_header();
-    fprintf(stderr, "can't load filters - logging everything\n");
+    CLIENT_ERROR(1, "%.*s SERVER AUDIT can't load filters - old filters are saved.",
+                 MYF(ME_FATAL), (int) err_len, err_msg);
+    explain_error("can't load filters - old filters are saved.");
+    memcpy(last_error_buf, err_msg, err_len+1);
+    filter_list= old_filter_list;
+    default_filter= old_default_filter;
+    user_list= old_user_list;
   }
   else
+  {
     log_config(thd, "reload_filters", "ON");
+    free_filters_ex(&old_filter_list, &old_default_filter, &old_user_list);
+  }
 
   flogger_mutex_unlock(&lock_operations);
   ADD_ATOMIC(internal_stop_logging, -1);
@@ -2840,7 +2893,8 @@ static void update_logging(MYSQL_THD thd,
 
     if (!logging)
     {
-      CLIENT_ERROR(1, "Logging cannot be enabled.", MYF(ME_FATAL));
+      CLIENT_ERROR(1, "%.*s SERVER_AUDIT cannot enable Logging.",
+                   MYF(ME_FATAL), err_len, err_msg);
     }
     log_config(thd, "logging", "ON");
   }
