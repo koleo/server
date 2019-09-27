@@ -7,12 +7,11 @@ if [ $1 = 0 ] ; then
         fi
         if [ -x %{_sysconfdir}/init.d/mysql ] ; then
                 %{_sysconfdir}/init.d/mysql stop > /dev/null
-                if [ -x /sbin/chkconfig ] ; then
-                        /sbin/chkconfig --del mysql > /dev/null 2>&1 || :
-                fi
+        fi
+        if [ -x /sbin/chkconfig ] ; then
+                /sbin/chkconfig --del mysql > /dev/null 2>&1 || :
         fi
 fi
 
 # We do not remove the mysql user since it may still own a lot of
 # database files.
-
