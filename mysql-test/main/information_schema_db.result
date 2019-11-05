@@ -267,25 +267,26 @@ root@localhost	root
 select * from v1i;
 current_user()	user
 foo@localhost	foo
-select * from v2d;
+select * from v2d order by 1;
 table_name
+server_audit_users
 user
-select * from v2i;
+select * from v2i order by 1;
 table_name
-select * from v3d;
+select * from v3d order by 1;
 schema_name
 mysql
-select * from v3i;
+select * from v3i order by 1;
 schema_name
-select * from v4d;
+select * from v4d order by 1;
 routine_name
 rootonly
-select * from v4i;
+select * from v4i order by 1;
 routine_name
-select * from v5d;
+select * from v5d order by 1;
 view_definition > ''
 1
-select * from v5i;
+select * from v5i order by 1;
 view_definition > ''
 0
 connection default;
@@ -297,28 +298,30 @@ select * from v1i;
 current_user()	user
 root@localhost	foo
 root@localhost	root
-select * from v2d;
+select * from v2d order by 1;
 table_name
+server_audit_users
 user
-select * from v2i;
+select * from v2i order by 1;
 table_name
+server_audit_users
 user
-select * from v3d;
+select * from v3d order by 1;
 schema_name
 mysql
-select * from v3i;
+select * from v3i order by 1;
 schema_name
 mysql
-select * from v4d;
+select * from v4d order by 1;
 routine_name
 rootonly
-select * from v4i;
+select * from v4i order by 1;
 routine_name
 rootonly
-select * from v5d;
+select * from v5d order by 1;
 view_definition > ''
 1
-select * from v5i;
+select * from v5i order by 1;
 view_definition > ''
 1
 disconnect foo;
