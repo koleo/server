@@ -1,5 +1,6 @@
 connection node_2;
 connection node_1;
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 CREATE TABLE encryption(a INT);
 NOT FOUND /CREATE TABLE encryption\(a INT\)/ in galera.page.00000*
 NOT FOUND /CREATE TABLE encryption\(a INT\)/ in galera.cache

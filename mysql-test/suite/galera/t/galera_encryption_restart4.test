@@ -8,6 +8,8 @@
 --source include/galera_cluster.inc
 --source include/have_innodb.inc
 
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
+
 # Save original auto_increment_offset values.
 --let $node_1=node_1
 --let $node_2=node_2
@@ -39,6 +41,7 @@ INSERT into encryption values (1, 'VerySecretMessage');
 --connection node_2
 
 --echo # node_2
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 show variables like 'encrypt_binlog';
 
 --let SEARCH_PATTERN= CREATE TABLE encryption\(a INT\)
@@ -76,6 +79,7 @@ EOF
 --source include/start_mysqld.inc
 
 --echo # node_2
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 
 call mtr.add_suppression("mysqld: File.*");
 call mtr.add_suppression("Plugin 'file_key_management' init function returned error.");
@@ -153,6 +157,7 @@ INSERT INTO encryption values (2, 'NotAnymoreSecret');
 EOF
 
 --source include/start_mysqld.inc
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 
 --echo # node_2
 

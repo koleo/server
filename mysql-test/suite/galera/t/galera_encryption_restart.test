@@ -13,6 +13,8 @@
 --connection node_1
 --echo # node_1
 
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
+
 CREATE TABLE encryption(a INT primary key, b text) engine=innodb;
 INSERT into encryption values (1, 'VerySecretMessage');
 
@@ -52,6 +54,8 @@ INSERT into encryption values (1, 'VerySecretMessage');
 --source include/restart_mysqld.inc
 
 --connection node_2
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
+
 INSERT INTO encryption values (2, 'VerySecretMessage2');
 
 --let SEARCH_PATTERN= CREATE TABLE encryption\(a INT\)

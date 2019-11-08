@@ -4,6 +4,7 @@ connection node_1;
 connection node_2;
 connection node_1;
 # node_1
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 CREATE TABLE encryption(a INT primary key, b text) engine=innodb;
 INSERT into encryption values (1, 'VerySecretMessage');
 NOT FOUND /CREATE TABLE encryption\(a INT\)/ in galera.page.00000*
@@ -16,6 +17,7 @@ NOT FOUND /VerySecretMessage/ in galera.page.00000*
 NOT FOUND /VerySecretMessage/ in galera.cache
 # Restart node 2
 connection node_2;
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 INSERT INTO encryption values (2, 'VerySecretMessage2');
 NOT FOUND /CREATE TABLE encryption\(a INT\)/ in galera.cache
 NOT FOUND /VerySecretMessage/ in galera.page.00000*

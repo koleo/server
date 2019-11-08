@@ -1,5 +1,6 @@
 connection node_2;
 connection node_1;
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 connection node_1;
 connection node_2;
 connection node_1;
@@ -12,6 +13,7 @@ NOT FOUND /VerySecretMessage/ in galera.page.00000*
 NOT FOUND /VerySecretMessage/ in galera.cache
 connection node_2;
 # node_2
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 show variables like 'encrypt_binlog';
 Variable_name	Value
 encrypt_binlog	ON
@@ -21,6 +23,7 @@ NOT FOUND /VerySecretMessage/ in galera.cache
 # Restart node 2 and disable encrypt-binlog
 connection node_2;
 # node_2
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 show variables like 'encrypt_binlog';
 Variable_name	Value
 encrypt_binlog	OFF
@@ -41,6 +44,7 @@ NOT FOUND /NotAnymoreSecret/ in galera.cache
 # Restart node 2 and enable encrypt-binlog
 connection node_2;
 # node_2
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 show variables like 'encrypt_binlog';
 Variable_name	Value
 encrypt_binlog	ON

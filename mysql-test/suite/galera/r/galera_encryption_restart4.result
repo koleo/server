@@ -1,5 +1,6 @@
 connection node_2;
 connection node_1;
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 connection node_1;
 connection node_2;
 connection node_1;
@@ -12,6 +13,7 @@ NOT FOUND /VerySecretMessage/ in galera.page.00000*
 NOT FOUND /VerySecretMessage/ in galera.cache
 connection node_2;
 # node_2
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 show variables like 'encrypt_binlog';
 Variable_name	Value
 encrypt_binlog	ON
@@ -21,6 +23,7 @@ NOT FOUND /VerySecretMessage/ in galera.cache
 # Restart node 2 with key file that does not exists
 connection node_2;
 # node_2
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 call mtr.add_suppression("mysqld: File.*");
 call mtr.add_suppression("Plugin 'file_key_management' init function returned error.");
 call mtr.add_suppression("Plugin 'file_key_management' registration as a ENCRYPTION failed.");
@@ -43,6 +46,7 @@ NOT FOUND /NotAnymoreSecret/ in galera.page.00000*
 NOT FOUND /NotAnymoreSecret/ in galera.cache
 # Restart node 2 with correct existing key file
 connection node_2;
+call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
 # node_2
 show variables like 'encrypt_binlog';
 Variable_name	Value
