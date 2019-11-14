@@ -24,6 +24,7 @@
 
 
 #ifndef _WIN32
+#define DO_SYSLOG
 #include <syslog.h>
 #else
 #define syslog(PRIORITY, FORMAT, INFO, MESSAGE_LEN, MESSAGE) do {}while(0)
@@ -430,10 +431,20 @@ static void do_reload_filters(MYSQL_THD thd, struct st_mysql_sys_var *var,
 
 /* bits in the event filter. */
 
+#ifdef DO_SYSLOG
 #define OUTPUT_SYSLOG 0
 #define OUTPUT_FILE 1
+#else
+#define OUTPUT_SYSLOG 0xFFFF
+#define OUTPUT_FILE 0
+#endif /*DO_SYSLOG*/
+
 #define OUTPUT_NO 0xFFFF
-static const char *output_type_names[]= { "syslog", "file", 0 };
+static const char *output_type_names[]= {
+#ifdef DO_SYSLOG
+  "syslog",
+#endif
+  "file", 0 };
 static TYPELIB output_typelib=
 {
     array_elements(output_type_names) - 1, "output_typelib",
