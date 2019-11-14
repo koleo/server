@@ -219,10 +219,10 @@ connection cn1;
 create table t1(id int) engine=myisam;
 insert delayed into t1 values (1);
 connection default;
-# Waiting until INSERT DELAYED thread does the insert.
+# Waiting until ALTER TABLE is blocked.
 drop table t1;
 set global server_audit_logging= off;
-set global server_audit_incl_users='root';
+set global server_audit_incl_users='';
 set global server_audit_logging= on;
 disconnect cn1;
 drop user user1@localhost;
@@ -262,7 +262,7 @@ server_audit_file_path
 server_audit_file_rotate_now	OFF
 server_audit_file_rotate_size	1000000
 server_audit_file_rotations	9
-server_audit_incl_users	root
+server_audit_incl_users	
 server_audit_logging	ON
 server_audit_mode	1
 server_audit_output_type	file

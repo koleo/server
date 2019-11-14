@@ -2241,16 +2241,35 @@ public:
     passed from connection thread to the handler thread.
   */
   MDL_request grl_protection;
+
+  void set_default_user()
+  {
+    thd.security_ctx->user=(char*) delayed_user;
+    thd.security_ctx->host=(char*) my_localhost;
+    thd.security_ctx->ip= NULL;
+    thd.query_id= 0;
+    thd.thread_id= 0;
+  }
+
+  void set_user_from_row(const delayed_row *r)
+  {
+    if (r)
+    {
+      thd.security_ctx->user= r->user;
+      thd.security_ctx->host= r->host;
+      thd.security_ctx->ip= r->ip;
+      thd.query_id= r->query_id;
+      thd.thread_id= r->thread_id;
+    }
+  }
+
   Delayed_insert(SELECT_LEX *current_select)
     :locks_in_memory(0), thd(next_thread_id()),
      table(0),tables_in_use(0), stacked_inserts(0),
      status(0), retry(0), handler_thread_initialized(FALSE), group_count(0)
   {
     DBUG_ENTER("Delayed_insert constructor");
-    thd.security_ctx->user=(char*) delayed_user;
-    thd.security_ctx->host=(char*) my_localhost;
-    thd.security_ctx->ip= NULL;
-    thd.query_id= 0;
+    set_default_user();
     strmake_buf(thd.security_ctx->priv_user, thd.security_ctx->user);
     thd.current_tablenr=0;
     thd.set_command(COM_DELAYED_INSERT);
@@ -2753,6 +2772,7 @@ int write_delayed(THD *thd, TABLE *table, enum_duplicates duplic,
   Delayed_insert *di=thd->di;
   const Discrete_interval *forced_auto_inc;
   size_t user_len, host_len, ip_len;
+
   DBUG_ENTER("write_delayed");
   DBUG_PRINT("enter", ("query = '%s' length %lu", query.str,
                        (ulong) query.length));
@@ -3249,6 +3269,7 @@ pthread_handler_t handle_delayed_insert(void *arg)
       if (di->tables_in_use && ! thd->lock &&
           (!thd->killed || di->stacked_inserts))
       {
+        di->set_user_from_row(di->rows.head());
         /*
           Request for new delayed insert.
           Lock the table, but avoid to be blocked by a global read lock.
@@ -3268,20 +3289,19 @@ pthread_handler_t handle_delayed_insert(void *arg)
       }
       if (di->stacked_inserts)
       {
+
         delayed_row *row;
         I_List_iterator<delayed_row> it(di->rows);
-        my_thread_id cur_thd= di->thd.thread_id;
-
         while ((row= it++))
         {
-          if (cur_thd != row->thread_id)
+          if (di->thd.thread_id != row->thread_id)
           {
-            mysql_audit_external_lock_ex(&di->thd, row->thread_id,
-                row->user, row->host, row->ip, row->query_id,
-                di->table->s, F_WRLCK);
-            cur_thd= row->thread_id;
+            di->set_user_from_row(row);
+            mysql_audit_external_lock(&di->thd, di->table->s, F_WRLCK);
           }
         }
+        di->set_default_user();
+
         if (di->handle_inserts())
         {
           /* Some fatal error */
