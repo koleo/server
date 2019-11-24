@@ -219,7 +219,7 @@ connection cn1;
 create table t1(id int) engine=myisam;
 insert delayed into t1 values (1);
 connection default;
-# Waiting until ALTER TABLE is blocked.
+# Waiting until INSERT DELAYED thread does the insert.
 drop table t1;
 set global server_audit_logging= off;
 set global server_audit_incl_users='';

@@ -2241,6 +2241,7 @@ public:
     passed from connection thread to the handler thread.
   */
   MDL_request grl_protection;
+  my_thread_id orig_thread_id;
 
   void set_default_user()
   {
@@ -2248,7 +2249,7 @@ public:
     thd.security_ctx->host=(char*) my_localhost;
     thd.security_ctx->ip= NULL;
     thd.query_id= 0;
-    thd.thread_id= 0;
+    thd.thread_id= orig_thread_id;
   }
 
   void set_user_from_row(const delayed_row *r)
