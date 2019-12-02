@@ -17,7 +17,7 @@ disable-s3
 
 ## -- Only enables stable plugins. Comment or change to unknown if you want
 #     to have all plugins enabled
-plugin-maturity=gamma
+plugin-maturity=stable
 
 # -- Auditing - pre-load Plugin
 plugin-load-add=server_audit2
