@@ -64,6 +64,9 @@
 #include "rpl_parallel.h"
 #include "semisync_master.h"
 #include "semisync_slave.h"
+#ifdef WITH_BLACKBOX
+#include "blackbox/blackbox.h"
+#endif /* WITH BLACKBOX */
 #include <ssl_compat.h>
 
 #define PCRE2_STATIC 1             /* Important on Windows */
@@ -6707,3 +6710,40 @@ static Sys_var_ulonglong Sys_max_rowid_filter_size(
        SESSION_VAR(max_rowid_filter_size), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(1024, (ulonglong)~(intptr)0), DEFAULT(128*1024),
        BLOCK_SIZE(1));
+#ifdef WITH_BLACKBOX
+
+static bool resize_black_box(sys_var *self, THD *thd, enum_var_type type)
+{
+  int rcode;
+
+  /* delete existing Black Box */
+  bb_unlink();
+  /* re-create the Black Box with the new size */
+  rcode = bb_open(wsrep_black_box_name, wsrep_black_box_size,
+                  mysql_real_data_home);
+  if (rcode < 0)
+  {
+    /* failure */
+    my_error(ER_BLACKBOX_ERROR, MYF(0), "Resizing of", bb_get_error(rcode));
+    wsrep_black_box_size = 0;
+    return true;
+  }
+  
+  /* success */
+  return false;
+}
+
+static Sys_var_ulong Sys_wsrep_black_box_size(
+       "wsrep_black_box_size",
+       "The size in bytes of the Black Box",
+       GLOBAL_VAR(wsrep_black_box_size),
+       CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, ULONG_MAX),
+       DEFAULT(0), BLOCK_SIZE(1), NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0),
+       ON_UPDATE(resize_black_box));
+
+static Sys_var_charptr_fscs Sys_wsrep_black_box_name(
+       "wsrep_black_box_name",
+       "The name of the Black Box",
+       READ_ONLY GLOBAL_VAR(wsrep_black_box_name),
+       CMD_LINE(REQUIRED_ARG), DEFAULT("bb-mariadb"));
+#endif /* WITH_BLACKBOX */

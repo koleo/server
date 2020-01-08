@@ -51,6 +51,9 @@
 #include "sql_manager.h"  // stop_handle_manager, start_handle_manager
 #include "sql_expression_cache.h" // subquery_cache_miss, subquery_cache_hit
 #include "sys_vars_shared.h"
+#ifdef WITH_BLACKBOX
+#include "blackbox/blackbox.h"
+#endif /* WITH_BLACKBOX */
 
 #include <m_ctype.h>
 #include <my_dir.h>
@@ -493,6 +496,10 @@ my_decimal decimal_zero;
 long opt_secure_timestamp;
 uint default_password_lifetime;
 my_bool disconnect_on_expired_password;
+#ifdef WITH_BLACKBOX
+ulong wsrep_black_box_size;
+char *wsrep_black_box_name;
+#endif /* WITH_BLACKBOX */
 
 bool max_user_connections_checking=0;
 /**
@@ -5515,6 +5522,21 @@ int mysqld_main(int argc, char **argv)
   check_data_home(mysql_real_data_home);
   if (my_setwd(mysql_real_data_home, opt_abort ? 0 : MYF(MY_WME)) && !opt_abort)
     unireg_abort(1);				/* purecov: inspected */
+#ifdef WITH_BLACKBOX
+
+  {
+    /* Initialize Black Box */
+    int rcode;
+
+    rcode = bb_open(wsrep_black_box_name, wsrep_black_box_size,
+                    mysql_real_data_home);
+    if (rcode < 0)
+    {
+      /* failure */
+      fprintf(stderr, "Opening of Black Box failed: %s", bb_get_error(rcode));
+    }
+  }
+#endif /* WITH_BLACKBOX */
 
   /* Atomic write initialization must be done as root */
   my_init_atomic_write();

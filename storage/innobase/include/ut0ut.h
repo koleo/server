@@ -445,6 +445,68 @@ private:
 	const bool	m_fatal;
 };
 
+#ifdef WITH_BLACKBOX
+/** This class provides a mechanism for sending messages to Black Box
+    and optionally also to MySQL log and stderr. For sending messages
+    to Black Box only use
+
+	ib::blackbox info_bb(false);
+	...
+	info_bb << "*** Priority TRANSACTION:";
+	trx_print_latched(info_bb.m_file, trx, 3000);
+	info_bb.flush();
+
+    and to send messages to both Black Box and MySQL log and stderr, write
+
+	ib::blackbox info_bb(true);
+	...
+	info_bb << "*** Priority TRANSACTION:";
+	trx_print_latched(info_bb.m_file, trx, 3000);
+	info_bb.flush();
+*/
+class blackbox {
+public:
+	/* If duplicate_to_stderr is true, then the message are also sent
+	   to MySQL log or stderr. */
+	ATTRIBUTE_COLD
+	blackbox(bool duplicate_to_stderr);
+
+	ATTRIBUTE_COLD
+	~blackbox();
+
+	template<typename T>
+	ATTRIBUTE_COLD
+	blackbox& operator<<(const T& rhs)
+	{
+		m_oss << rhs;
+		flush();
+		return(*this);
+	}
+
+	/* Flush the messages in internal buffers. */
+	ATTRIBUTE_COLD
+	void flush();
+
+	/* Return a stream that should be used instead of stderr. */
+	FILE *file()
+	{
+		return (m_file);
+	}
+
+private:
+	/* if true, messages are sent also to MySQL log or stderr */
+	bool m_duplicate_to_stderr;
+	/* buffer for messages emitted with the "<<" operator */
+	std::ostringstream m_oss;
+	/* a file stream that is either stderr or an in-memory stream
+	   opened with fmemopen(3) */
+	FILE *m_file;
+#define BLACKBOX_BUFFER_SIZE 8196
+	/* buffer for the in-memory stream */
+	char m_buffer[BLACKBOX_BUFFER_SIZE];
+};
+
+#endif /* WITH_BLACKBOX */
 } // namespace ib
 
 #include "ut0ut.ic"

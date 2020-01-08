@@ -733,6 +733,18 @@ lock_rec_has_to_wait(
 	    && wsrep_thd_is_BF(lock2->trx->mysql_thd, FALSE)) {
 		mtr_t mtr;
 
+#ifdef WITH_BLACKBOX
+		ib::blackbox info_bb(wsrep_debug);
+
+		info_bb << "BF-BF lock conflict, locking: "
+			<< for_locking;
+		lock_rec_print(info_bb.file(), lock2, mtr);
+		info_bb.flush();
+		info_bb
+			<< " SQL1: " << wsrep_thd_query(trx->mysql_thd)
+			<< " SQL2: "
+			<< wsrep_thd_query(lock2->trx->mysql_thd);
+#else /* WITH_BLACKBOX */
 		if (UNIV_UNLIKELY(wsrep_debug)) {
 			ib::info() << "BF-BF lock conflict, locking: "
 				   << for_locking;
@@ -742,9 +754,35 @@ lock_rec_has_to_wait(
 				<< " SQL2: "
 				<< wsrep_thd_query(lock2->trx->mysql_thd);
 		}
+#endif /* WITH_BLACKBOX */
 
 		if ((type_mode & LOCK_MODE_MASK) == LOCK_X
 		    && (lock2->type_mode & LOCK_MODE_MASK) == LOCK_X) {
+#ifdef WITH_BLACKBOX
+			ib::blackbox info_bb(for_locking || UNIV_UNLIKELY(wsrep_debug));
+
+			/* exclusive lock conflicts are not accepted */
+			info_bb
+				<< "BF-BF X lock conflict,mode: "
+				<< type_mode
+				<< " supremum: " << lock_is_on_supremum
+				<< "conflicts states: my "
+				<< wsrep_thd_transaction_state_str(
+					trx->mysql_thd)
+				<< " locked "
+				<< wsrep_thd_transaction_state_str(
+					lock2->trx->mysql_thd);
+			lock_rec_print(info_bb.file(), lock2, mtr);
+			info_bb.flush();
+			info_bb << " SQL1: "
+				<< wsrep_thd_query(trx->mysql_thd)
+				<< " SQL2: "
+				<< wsrep_thd_query(lock2->trx->mysql_thd);
+
+			if (for_locking) {
+				return false;
+			}
+#else /* WITH_BLACKBOX */
 			if (for_locking || UNIV_UNLIKELY(wsrep_debug)) {
 				/* exclusive lock conflicts are not
 				   accepted */
@@ -769,11 +807,30 @@ lock_rec_has_to_wait(
 					return false;
 				}
 			}
+#endif /* WITH_BLACKBOX */
 		} else {
 			/* if lock2->index->n_uniq <=
 			   lock2->index->n_user_defined_cols
 			   operation is on uniq index
 			*/
+#ifdef WITH_BLACKBOX
+			ib::blackbox info_bb(wsrep_debug);
+
+			info_bb
+				<< "BF conflict, modes: " << type_mode
+				<< ":" << lock2->type_mode
+				<< " idx: " << lock2->index->name()
+				<< " table: "
+				<< lock2->index->table->name.m_name
+				<< " n_uniq: " << lock2->index->n_uniq
+				<< " n_user: "
+				<< lock2->index->n_user_defined_cols
+				<< " SQL1: "
+				<< wsrep_thd_query(trx->mysql_thd)
+				<< " SQL2: "
+				<< wsrep_thd_query(
+					lock2->trx->mysql_thd);
+#else /* WITH_BLACKBOX */
 			if (wsrep_debug) {
 				ib::info()
 					<< "BF conflict, modes: " << type_mode
@@ -791,6 +848,7 @@ lock_rec_has_to_wait(
 						   lock2->trx->mysql_thd);
 			}
 			return false;
+#endif /* WITH_BLACKBOX */
 		}
 	}
 #endif /* WITH_WSREP */
@@ -1086,12 +1144,49 @@ wsrep_kill_victim(
 			trx->mysql_thd, lock->trx->mysql_thd))) {
 
 		if (lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
+#ifdef WITH_BLACKBOX
+			ib::blackbox info_bb(wsrep_debug);
+
+			info_bb << "WSREP: BF victim waiting\n";
+#else  /* WITH_BLACKBOX */
 			if (UNIV_UNLIKELY(wsrep_debug)) {
 				ib::info() << "WSREP: BF victim waiting\n";
 			}
+#endif /* WITH_BLACKBOX */
 			/* cannot release lock, until our lock
 			is in the queue*/
 		} else if (lock->trx != trx) {
+#ifdef WITH_BLACKBOX
+			ib::blackbox info_bb(wsrep_log_conflicts);
+
+			info_bb << "*** Priority TRANSACTION:";
+
+			trx_print_latched(info_bb.file(), trx, 3000);
+			info_bb.flush();
+
+			if (bf_other) {
+				info_bb << "*** Priority TRANSACTION:";
+			} else {
+				info_bb << "*** Victim TRANSACTION:";
+			}
+
+			trx_print_latched(info_bb.file(), lock->trx, 3000);
+			info_bb.flush();
+
+			info_bb << "*** WAITING FOR THIS LOCK TO BE GRANTED:";
+
+			if (lock_get_type(lock) == LOCK_REC) {
+				lock_rec_print(info_bb.file(), lock, mtr);
+			} else {
+				lock_table_print(info_bb.file(), lock);
+			}
+			info_bb.flush();
+
+			info_bb << " SQL1: "
+				<< wsrep_thd_query(trx->mysql_thd);
+			info_bb << " SQL2: "
+				<< wsrep_thd_query(lock->trx->mysql_thd);
+#else  /* WITH_BLACKBOX */
 			if (wsrep_log_conflicts) {
 				ib::info() << "*** Priority TRANSACTION:";
 
@@ -1117,7 +1212,7 @@ wsrep_kill_victim(
 				ib::info() << " SQL2: "
 					   << wsrep_thd_query(lock->trx->mysql_thd);
 			}
-
+#endif /* WITH_BLACKBOX */
 			wsrep_innobase_kill_one_trx(trx->mysql_thd,
 						    lock->trx, true);
 		}
@@ -1271,6 +1366,32 @@ wsrep_print_wait_locks(
 /*===================*/
 	lock_t*		c_lock) /* conflicting lock to print */
 {
+#ifdef WITH_BLACKBOX
+	if (c_lock->trx->lock.wait_lock != c_lock) {
+		ib::blackbox info_bb(wsrep_debug);
+		mtr_t mtr;
+
+		info_bb << "WSREP: c_lock != wait lock";
+		info_bb << " SQL: "
+			<< wsrep_thd_query(c_lock->trx->mysql_thd);
+
+		if (lock_get_type_low(c_lock) & LOCK_TABLE) {
+			lock_table_print(info_bb.file(), c_lock);
+		} else {
+			lock_rec_print(info_bb.file(), c_lock, mtr);
+		}
+		info_bb.flush();
+
+		if (lock_get_type_low(c_lock->trx->lock.wait_lock) & LOCK_TABLE) {
+			lock_table_print(info_bb.file(),
+					 c_lock->trx->lock.wait_lock);
+		} else {
+			lock_rec_print(info_bb.file(),
+				       c_lock->trx->lock.wait_lock, mtr);
+		}
+		info_bb.flush();
+	}
+#else /* WITH_BLACKBOX */
 	if (c_lock->trx->lock.wait_lock != c_lock) {
 		mtr_t mtr;
 		ib::info() << "WSREP: c_lock != wait lock";
@@ -1290,6 +1411,7 @@ wsrep_print_wait_locks(
 				       mtr);
 		}
 	}
+#endif /* WITH_BLACKBOX */
 }
 #endif /* WITH_WSREP */
 
@@ -1423,9 +1545,7 @@ lock_rec_create_low(
 
 			c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
 
-			if (UNIV_UNLIKELY(wsrep_debug)) {
-				wsrep_print_wait_locks(c_lock);
-			}
+			wsrep_print_wait_locks(c_lock);
 
 			trx->lock.que_state = TRX_QUE_LOCK_WAIT;
 			lock_set_lock_and_trx_wait(lock, trx);
@@ -1450,6 +1570,14 @@ lock_rec_create_low(
 
 			trx_mutex_exit(c_lock->trx);
 
+#ifdef WITH_BLACKBOX
+			ib::blackbox info_bb(wsrep_debug);
+
+			info_bb << "WSREP: c_lock canceled "
+				<< ib::hex(c_lock->trx->id)
+				<< " SQL: "
+				<< wsrep_thd_query(c_lock->trx->mysql_thd);
+#else /* WITH_BLACKBOX */
 			if (UNIV_UNLIKELY(wsrep_debug)) {
 				ib::info() << "WSREP: c_lock canceled "
 					   << ib::hex(c_lock->trx->id)
@@ -1457,6 +1585,7 @@ lock_rec_create_low(
 					   << wsrep_thd_query(
 						   c_lock->trx->mysql_thd);
 			}
+#endif /* WITH_BLACKBOX */
 
 			/* have to bail out here to avoid lock_set_lock... */
 			return(lock);
@@ -1717,10 +1846,18 @@ lock_rec_enqueue_waiting(
 		transaction as a victim, it is possible that we
 		already have the lock now granted! */
 #ifdef WITH_WSREP
+#ifdef WITH_BLACKBOX
+		ib::blackbox info_bb(wsrep_debug);
+
+		info_bb << "WSREP: BF thread got lock granted early, ID "
+			<< ib::hex(trx->id)
+			<< " query: " << wsrep_thd_query(trx->mysql_thd);
+#else /* WITH_BLACKBOX */
 		if (UNIV_UNLIKELY(wsrep_debug)) {
 			ib::info() << "WSREP: BF thread got lock granted early, ID " << ib::hex(trx->id)
 				   << " query: " << wsrep_thd_query(trx->mysql_thd);
 		}
+#endif /* WITH_BLACKBOX */
 #endif
 		return DB_SUCCESS_LOCKED_REC;
 	}
@@ -2039,7 +2176,21 @@ lock_rec_has_to_wait_in_queue(
 #ifdef WITH_WSREP
 			if (wsrep_thd_is_BF(wait_lock->trx->mysql_thd, FALSE) &&
 			    wsrep_thd_is_BF(lock->trx->mysql_thd, FALSE)) {
-
+#ifdef WITH_BLACKBOX
+				ib::blackbox info_bb(wsrep_debug);
+				mtr_t mtr;
+				info_bb << "WSREP: waiting BF trx: "
+					<< ib::hex(wait_lock->trx->id)
+					<< " query: "
+					<< wsrep_thd_query(wait_lock->trx->mysql_thd);
+				lock_rec_print(info_bb.file(), wait_lock, mtr);
+				info_bb.flush();
+				info_bb << "WSREP: do not wait another BF trx: " << ib::hex(lock->trx->id)
+					<< " query: "
+					<< wsrep_thd_query(lock->trx->mysql_thd);
+				lock_rec_print(info_bb.file(), lock, mtr);
+				info_bb.flush();
+#else /* WITH_BLACKBOX */
 				if (UNIV_UNLIKELY(wsrep_debug)) {
 					mtr_t mtr;
 					ib::info() << "WSREP: waiting BF trx: " << ib::hex(wait_lock->trx->id)
@@ -2049,6 +2200,7 @@ lock_rec_has_to_wait_in_queue(
 						   << " query: " << wsrep_thd_query(lock->trx->mysql_thd);
 					lock_rec_print(stderr, lock, mtr);
 				}
+#endif /* WITH_BLACKBOX */
 				/* don't wait for another BF lock */
 				continue;
 			}
@@ -3505,6 +3657,16 @@ lock_table_create(
 		if (wsrep_thd_is_BF(trx->mysql_thd, FALSE)) {
 			ut_list_insert(table->locks, c_lock, lock,
 				       TableLockGetNode());
+#ifdef WITH_BLACKBOX
+			ib::blackbox info_bb(wsrep_debug);
+
+			info_bb << "table lock BF conflict for "
+				<< ib::hex(c_lock->trx->id)
+				<< " SQL: "
+				<< wsrep_thd_query(
+					c_lock->trx->mysql_thd);
+
+#else /* WITH_BLACKBOX */
 			if (UNIV_UNLIKELY(wsrep_debug)) {
 				ib::info() << "table lock BF conflict for "
 					   << ib::hex(c_lock->trx->id)
@@ -3512,6 +3674,7 @@ lock_table_create(
 					   << wsrep_thd_query(
 						   c_lock->trx->mysql_thd);
 			}
+#endif /* WITH_BLACKBOX */
 		} else {
 			ut_list_append(table->locks, lock, TableLockGetNode());
 		}
@@ -3521,9 +3684,7 @@ lock_table_create(
 		if (c_lock->trx->lock.que_state == TRX_QUE_LOCK_WAIT) {
 			c_lock->trx->lock.was_chosen_as_deadlock_victim = TRUE;
 
-			if (UNIV_UNLIKELY(wsrep_debug)) {
-				wsrep_print_wait_locks(c_lock);
-			}
+			wsrep_print_wait_locks(c_lock);
 
 			/* The lock release will call lock_grant(),
 			which would acquire trx->mutex again. */
@@ -3532,6 +3693,14 @@ lock_table_create(
 				c_lock->trx->lock.wait_lock);
 			trx_mutex_enter(trx);
 
+#ifdef WITH_BLACKBOX
+			ib::blackbox info_bb(wsrep_debug);
+
+			info_bb << "WSREP: c_lock canceled "
+				<< ib::hex(c_lock->trx->id)
+				<< " SQL: "
+				<< wsrep_thd_query(c_lock->trx->mysql_thd);
+#else /* WITH_BLACKBOX */
 			if (UNIV_UNLIKELY(wsrep_debug)) {
 				ib::info() << "WSREP: c_lock canceled "
 					   << ib::hex(c_lock->trx->id)
@@ -3539,6 +3708,7 @@ lock_table_create(
 					   << wsrep_thd_query(
 						   c_lock->trx->mysql_thd);
 			}
+#endif /* WITH_BLACKBOX */
 		}
 
 		trx_mutex_exit(c_lock->trx);
@@ -3805,12 +3975,21 @@ lock_table_other_has_incompatible(
 
 #ifdef WITH_WSREP
 			if (lock->trx->is_wsrep()) {
+#ifdef WITH_BLACKBOX
+				ib::blackbox info_bb(wsrep_debug);
+
+				info_bb << "WSREP: table lock abort for table:"
+					<< table->name.m_name;
+				info_bb << " SQL: "
+					<< wsrep_thd_query(lock->trx->mysql_thd);
+#else /* WITH_BLACKBOX */
 				if (UNIV_UNLIKELY(wsrep_debug)) {
 					ib::info() << "WSREP: table lock abort for table:"
 						   << table->name;
 					ib::info() << " SQL: "
 					   << wsrep_thd_query(lock->trx->mysql_thd);
 				}
+#endif /* WITH_BLACKBOX */
 				trx_mutex_enter(lock->trx);
 				wsrep_kill_victim((trx_t *)trx, (lock_t *)lock);
 				trx_mutex_exit(lock->trx);

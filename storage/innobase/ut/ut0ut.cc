@@ -602,6 +602,57 @@ fatal_or_error::~fatal_or_error()
 	}
 }
 
+#ifdef WITH_BLACKBOX
+blackbox::blackbox(bool duplicate_to_stderr)
+{
+	m_duplicate_to_stderr = duplicate_to_stderr;
+	m_file = fmemopen(m_buffer, BLACKBOX_BUFFER_SIZE, "w");
+	if (m_file == NULL) {
+		/* failure, use stderr instead */
+		m_file = stderr;
+	} else {
+		setbuf(m_file, NULL);
+	}
+}
+
+blackbox::~blackbox()
+{
+	flush();
+
+	if (m_file != stderr) {
+		fclose(m_file);
+	}
+}
+
+void
+blackbox::flush()
+{
+	if (!m_oss.str().empty()) {
+		if (m_duplicate_to_stderr) {
+			sql_print_information("InnoDB: %s",
+					      m_oss.str().c_str());
+		} else {
+			sql_print_information_bb("InnoDB: %s",
+						 m_oss.str().c_str());
+		}
+		m_oss.seekp(0);
+		m_oss.str("");
+	}
+
+	if (m_file != stderr && ftell(m_file) != 0) {
+		if (ftell(m_file) < BLACKBOX_BUFFER_SIZE) {
+			m_buffer[ftell(m_file)] = 0;
+		} else {
+			m_buffer[BLACKBOX_BUFFER_SIZE - 1] = 0;
+		}
+		if (m_duplicate_to_stderr) {
+			fwrite(m_buffer, 1, ftell(m_file), stderr);
+		}
+		sql_print_information_bb("InnoDB: %s", m_buffer);
+		rewind(m_file);
+	}
+}
+#endif /* WITH_BLACKBOX */
 } // namespace ib
 
 #endif /* !UNIV_INNOCHECKSUM */

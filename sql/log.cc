@@ -39,6 +39,9 @@
 #include "rpl_rli.h"
 #include "sql_audit.h"
 #include "mysqld.h"
+#ifdef WITH_BLACKBOX
+#include "blackbox/blackbox.h"
+#endif /* WITH_BLACKBOX */
 
 #include <my_dir.h>
 #include <m_ctype.h>				// For test_if_number
@@ -1196,6 +1199,11 @@ void LOGGER::cleanup_base()
   }
   if (file_log_handler)
     file_log_handler->cleanup();
+#ifdef WITH_BLACKBOX
+
+  /* delete Black Box */
+  bb_unlink();
+#endif /* WITH_BLACKBOX */
 }
 
 
@@ -9063,8 +9071,48 @@ int vprint_msg_to_log(enum loglevel level, const char *format, va_list args)
   print_buffer_to_nt_eventlog(level, buff, length, sizeof(buff));
 #endif
 
+#ifdef WITH_BLACKBOX
+  /* write message to Black Box */
+  const char *keyword = (level == ERROR_LEVEL ? "ERROR" :
+                         level == WARNING_LEVEL ? "Warning" : "Note");
+  bb_write(keyword, buff, length);
+
+#endif /* WITH_BLACKBOX */
   DBUG_RETURN(0);
 }
+#ifdef WITH_BLACKBOX
+
+/**
+  Prints a printf style message to Black Box.
+
+  This function prints the message into a buffer and then writes that buffer
+  to Black Box.
+
+  @param level          The level of the msg significance
+  @param format         Printf style format of message
+  @param args           va_list list of arguments for the message
+
+  @returns
+    The function always returns 0. The return value is present in the
+    signature to be compatible with other logging routines, which could
+    return an error (e.g. logging to the log tables)
+*/
+int vprint_msg_to_blackbox(enum loglevel level, const char *format, va_list args)
+{
+  char   buff[1024];
+  size_t length;
+  DBUG_ENTER("vprint_msg_to_blackbox");
+
+  length= my_vsnprintf(buff, sizeof(buff), format, args);
+
+  /* write message to Black Box */
+  const char *keyword = (level == ERROR_LEVEL ? "ERROR" :
+                         level == WARNING_LEVEL ? "Warning" : "Note");
+  bb_write(keyword, buff, length);
+
+  DBUG_RETURN(0);
+}
+#endif /* WITH_BLACKBOX */
 #endif /* EMBEDDED_LIBRARY */
 
 
@@ -9105,6 +9153,21 @@ void sql_print_information(const char *format, ...)
 
   DBUG_VOID_RETURN;
 }
+#ifdef WITH_BLACKBOX
+
+/** Prints a message to Black Box. */
+void sql_print_information_bb(const char *format, ...)
+{
+  va_list args;
+  DBUG_ENTER("sql_print_information_bb");
+
+  va_start(args, format);
+  vprint_msg_to_blackbox(INFORMATION_LEVEL, format, args);
+  va_end(args);
+
+  DBUG_VOID_RETURN;
+}
+#endif /* WITH_BLACKBOX */
 
 void sql_print_information_v(const char *format, va_list ap)
 {

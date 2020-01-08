@@ -301,6 +301,10 @@ extern const char *encryption_algorithm_names[];
 extern long opt_secure_timestamp;
 extern uint default_password_lifetime;
 extern my_bool disconnect_on_expired_password;
+#ifdef WITH_BLACKBOX
+extern ulong wsrep_black_box_size;
+extern char *wsrep_black_box_name;
+#endif /* WITH_BLACKBOX */
 
 enum secure_timestamp { SECTIME_NO, SECTIME_SUPER, SECTIME_REPL, SECTIME_YES };
 

@@ -384,6 +384,25 @@ IF(_FILE_OFFSET_BITS)
 ENDIF()
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR}/include)
 
+# Definitions for the Black Box debug tool
+
+OPTION(WITH_BLACKBOX "Compile with Black Box debug feature" ON)
+IF(WIN32)
+  SET(WITH_BLACKBOX OFF)
+ENDIF()
+IF(APPLE)
+  SET(WITH_BLACKBOX OFF)
+ENDIF()
+IF(WITH_BLACKBOX)
+  ADD_DEFINITIONS(-DWITH_BLACKBOX)
+  SET(BB_ROOT ${CMAKE_SOURCE_DIR}/blackbox)
+  SET(BB_INCLUDE_DIR ${BB_ROOT}/include)
+  SET(BB_SOURCES ${BB_ROOT}/src/blackbox.c)
+  SET(BB_LIB blackbox)
+  ADD_SUBDIRECTORY(blackbox)
+  INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/blackbox/src/bbtool COMPONENT Server DESTINATION ${INSTALL_SBINDIR})
+ENDIF() 
+
 # Add bundled or system zlib.
 MYSQL_CHECK_ZLIB_WITH_COMPRESS()
 # Add bundled wolfssl/wolfcrypt or system openssl.

@@ -254,8 +254,17 @@ extern wsrep_seqno_t wsrep_locked_seqno;
    the log message with WSREP and forward the result buffer to fun. */
 void WSREP_LOG(void (*fun)(const char* fmt, ...), const char* fmt, ...);
 
+#ifdef WITH_BLACKBOX
+#define WSREP_DEBUG(...)                                                \
+  {                                                                     \
+    if (wsrep_debug) sql_print_information( "WSREP: " __VA_ARGS__);     \
+    else sql_print_information_bb( "WSREP: " __VA_ARGS__);              \
+  }
+#define WSREP_INFO_BB(...)  sql_print_information_bb( "WSREP: " __VA_ARGS__)
+#else /* WITH_BLACKBOX */
 #define WSREP_DEBUG(...)                                                \
     if (wsrep_debug)     sql_print_information( "WSREP: " __VA_ARGS__)
+#endif /* WITH_BLACKBOX */
 #define WSREP_INFO(...)  sql_print_information( "WSREP: " __VA_ARGS__)
 #define WSREP_WARN(...)  sql_print_warning(     "WSREP: " __VA_ARGS__)
 #define WSREP_ERROR(...) sql_print_error(       "WSREP: " __VA_ARGS__)
@@ -274,6 +283,41 @@ void WSREP_LOG(void (*fun)(const char* fmt, ...), const char* fmt, ...);
             wsrep_thd_query(thd)                                        \
             );
 
+#ifdef WITH_BLACKBOX
+#define WSREP_LOG_CONFLICT_THD_BB(thd, role)                            \
+  sql_print_information_bb(                                             \
+            "WSREP: %s: \n "                                            \
+            "  THD: %lu, mode: %s, state: %s, conflict: %s, seqno: %lld\n " \
+            "  SQL: %s",                                                \
+            role,                                                       \
+            thd_get_thread_id(thd),                                     \
+            wsrep_thd_client_mode_str(thd),                             \
+            wsrep_thd_client_state_str(thd),                            \
+            wsrep_thd_transaction_state_str(thd),                       \
+            wsrep_thd_trx_seqno(thd),                                   \
+            wsrep_thd_query(thd)                                        \
+            );
+#endif /* WITH_BLACKBOX */
+
+#ifdef WITH_BLACKBOX
+#define WSREP_LOG_CONFLICT(bf_thd, victim_thd, bf_abort)                \
+  if (wsrep_debug || wsrep_log_conflicts)                               \
+  {                                                                     \
+    sql_print_information( "WSREP: cluster conflict due to %s for threads:", \
+              (bf_abort) ? "high priority abort" : "certification failure" \
+              );                                                        \
+    if (bf_thd)     WSREP_LOG_CONFLICT_THD(bf_thd, "Winning thread");   \
+    if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread"); \
+    sql_print_information("WSREP: context: %s:%d", __FILE__, __LINE__); \
+  } else {                                                              \
+    sql_print_information_bb( "WSREP: cluster conflict due to %s for threads:", \
+              (bf_abort) ? "high priority abort" : "certification failure" \
+              );                                                        \
+    if (bf_thd)     WSREP_LOG_CONFLICT_THD_BB(bf_thd, "Winning thread");   \
+    if (victim_thd) WSREP_LOG_CONFLICT_THD_BB(victim_thd, "Victim thread"); \
+    sql_print_information_bb("WSREP: context: %s:%d", __FILE__, __LINE__); \
+  }
+#else /* WITH_BLACKBOX */
 #define WSREP_LOG_CONFLICT(bf_thd, victim_thd, bf_abort)                \
   if (wsrep_debug || wsrep_log_conflicts)                               \
   {                                                                     \
@@ -284,6 +328,7 @@ void WSREP_LOG(void (*fun)(const char* fmt, ...), const char* fmt, ...);
     if (victim_thd) WSREP_LOG_CONFLICT_THD(victim_thd, "Victim thread"); \
     sql_print_information("WSREP: context: %s:%d", __FILE__, __LINE__); \
   }
+#endif /* WITH_BLACKBOX */
 
 #define WSREP_PROVIDER_EXISTS                                                  \
   (wsrep_provider && strncasecmp(wsrep_provider, WSREP_NONE, FN_REFLEN))

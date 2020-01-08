@@ -1759,6 +1759,15 @@ MDL_lock::can_grant_lock(enum_mdl_type type_arg,
             WSREP_INFO("MDL conflict db=%s table=%s ticket=%d solved by abort",
                        key->db_name(), key->name(), ticket.get_type());
           }
+#ifdef WITH_BLACKBOX
+          else
+          {
+            auto key= ticket.get_key();
+            WSREP_INFO_BB("MDL conflict db=%s table=%s ticket=%d solved by "
+                          "abort",
+                          key->db_name(), key->name(), ticket.get_type());
+          }
+#endif /* WITH_BLACKBOX */
           continue;
         }
 #endif /* WITH_WSREP */
