@@ -26,21 +26,15 @@ INCLUDE(CheckLibraryExists)
 INCLUDE(CheckSymbolExists)
 INCLUDE(CheckTypeSize)
 
-CHECK_CXX_SOURCE_COMPILES("
-#include <check.h>
-int main(int argc, char **argv)
-{
-  int rcode=5;
-  ch_assert_int_eq(rcode, 0);
-}"
-CHECK_FUNCTIONS)
-
-IF (CHECK_FUNCTIONS)
-  # find CHECK package for unit testing
-  FIND_PACKAGE(Check REQUIRED)
+FIND_PACKAGE(Check)  
+IF(CHECK_FOUND)
   ADD_EXECUTABLE(unittest unittest.c)
   TARGET_LINK_LIBRARIES(unittest blackbox)
   TARGET_LINK_LIBRARIES(unittest "-lrt")
   TARGET_LINK_LIBRARIES(unittest ${CHECK_LIBRARIES} pthread)
   ADD_TEST(NAME unittest COMMAND unittest)
-ENDIF(CHECK_FUNCTIONS)
+  MESSAGE("   The package 'check' was found - unit testing is enabled")
+ELSE(CHECK_FOUND)
+  MESSAGE("   The package 'check' was not found - unit testing is disabled")
+ENDIF(CHECK_FOUND)
+
