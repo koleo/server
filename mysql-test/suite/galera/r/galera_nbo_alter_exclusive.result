@@ -21,8 +21,8 @@ ERROR HY000: Lock wait timeout exceeded; try restarting transaction
 SELECT * FROM t1;
 ERROR HY000: Lock wait timeout exceeded; try restarting transaction
 connection node_2;
-SET DEBUG_SYNC= 'now SIGNAL signal.wsrep_alter_locked_tables';
 SET GLOBAL debug_dbug = '';
+SET DEBUG_SYNC= 'now SIGNAL signal.wsrep_alter_locked_tables';
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (

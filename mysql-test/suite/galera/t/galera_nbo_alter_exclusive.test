@@ -45,8 +45,10 @@ SELECT * FROM t1;
 
 # Unblock the ALTER and confirm that it executed on all nodes
 --connection node_2
-SET DEBUG_SYNC= 'now SIGNAL signal.wsrep_alter_locked_tables';
+# clear debug_dbug before signaling to avoid
+# getting stuck in sync point for in nbo phase 2
 SET GLOBAL debug_dbug = '';
+SET DEBUG_SYNC= 'now SIGNAL signal.wsrep_alter_locked_tables';
 
 --let $wait_condition = SELECT COUNT(*) = 0 FROM INFORMATION_SCHEMA.PROCESSLIST WHERE INFO LIKE 'ALTER%';
 --source include/wait_condition.inc

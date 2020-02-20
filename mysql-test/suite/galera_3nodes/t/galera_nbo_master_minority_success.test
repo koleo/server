@@ -29,9 +29,24 @@ SET SESSION wsrep_on=ON;
 
 # Node #2 goes non-prim because it is in the minority
 --connection node_2
+SET DEBUG_SYNC = 'alter_table_inplace_after_lock_downgrade SIGNAL lock_downgraded WAIT_FOR continue';
 SET SESSION wsrep_osu_method=NBO;
+--send ALTER TABLE t1 LOCK=SHARED, ADD PRIMARY KEY (f1);
+
+--connect node_2a, 127.0.0.1, root, , test, $NODE_MYPORT_2
+--connection node_2a
+SET DEBUG_SYNC = 'now WAIT_FOR lock_downgraded';
+
+SET SESSION wsrep_sync_wait = 0;
+--let wait_condition = SELECT VARIABLE_VALUE = 'Disconnected' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_status';
+--source include/wait_condition.inc
+--let wait_condition =  SELECT VARIABLE_VALUE = 'Inconsistent' FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_local_state_comment';
+--source include/wait_condition.inc
+
+SET DEBUG_SYNC = 'now SIGNAL continue';
+--connection node_2
 --error ER_QUERY_INTERRUPTED
-ALTER TABLE t1 LOCK=SHARED, ADD PRIMARY KEY (f1);
+--reap
 
 --source ./galera_check_voting_recovery.inc
 
@@ -43,6 +58,7 @@ DROP TABLE t1;
 CALL mtr.add_suppression("Slave SQL: Error");
 
 --connection node_2
+SET DEBUG_SYNC = 'RESET';
 CALL mtr.add_suppression("inconsistent with group");
 CALL mtr.add_suppression("Failed to send NBO-end");
 CALL mtr.add_suppression("NBO phase two begin failed for:");

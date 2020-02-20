@@ -7925,11 +7925,6 @@ static bool mysql_inplace_alter_table(THD *thd,
   DEBUG_SYNC(thd, "alter_table_inplace_after_lock_upgrade");
   THD_STAGE_INFO(thd, stage_alter_inplace_prepare);
 
-#ifdef WITH_WSREP
-  wsrep_nbo_phase_one_end(thd);
-
-#endif  /* WITH_WSREP */
-
   switch (inplace_supported) {
   case HA_ALTER_ERROR:
   case HA_ALTER_INPLACE_NOT_SUPPORTED:
@@ -7986,6 +7981,16 @@ static bool mysql_inplace_alter_table(THD *thd,
     }
   }
 
+#ifdef WITH_WSREP
+  /*
+    MENT-644
+    End NBO phase one after the above MDL lock downgrade,
+    to avoid MDL conflicts with executing concurrently DMLs.
+   */
+  if (WSREP(thd))
+    wsrep_nbo_phase_one_end(thd);
+#endif /* WITH_WSREP */
+
   DEBUG_SYNC(thd, "alter_table_inplace_after_lock_downgrade");
   THD_STAGE_INFO(thd, stage_alter_inplace);
 
@@ -7993,6 +7998,16 @@ static bool mysql_inplace_alter_table(THD *thd,
   thd->abort_on_warning= !ha_alter_info->ignore && thd->is_strict_mode();
   res= table->file->ha_inplace_alter_table(altered_table, ha_alter_info);
   thd->abort_on_warning= false;
+
+#ifdef WITH_WSREP
+  /*
+    MENT-644
+    Begin NBO phase two before upgrading the MDL lock below.
+  */
+  if (WSREP(thd))
+    wsrep_nbo_phase_two_begin(thd);
+#endif /* WITH_WSREP */
+
   if (res)
     goto rollback;
 

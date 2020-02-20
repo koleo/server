@@ -598,7 +598,7 @@ static void* process_apply_nbo(void *args_ptr)
   thd->set_command(COM_SLEEP);
   thd->reset_for_next_command(true);
 
-  thd->wsrep_nbo_notify_ctx= args->notify;
+  thd->wsrep_nbo_ctx.set_notifier(args->notify);
   wsrep_open(thd);
   if (wsrep_before_command(thd))
   {
@@ -614,15 +614,15 @@ static void* process_apply_nbo(void *args_ptr)
   }
 
   apply_err= wsrep_apply_events(thd, thd->wsrep_rgi->rli,
-                              data.data(), data.size());
+                                data.data(), data.size());
   if (apply_err || wsrep_thd_has_ignored_error(thd))
   {
     wsrep_thd_set_ignored_error(thd, false);
-    if (apply_err && thd->wsrep_nbo_notify_ctx)
+    if (apply_err && thd->wsrep_nbo_ctx.notifier())
     {
       wsrep::mutable_buffer err;
       wsrep_store_error(thd, err);
-      thd->wsrep_nbo_notify_ctx->set_error(err);
+      thd->wsrep_nbo_ctx.set_error(err);
     }
     wsrep_dump_rbr_buf_with_header(thd, data.data(), data.size());
   }
@@ -652,10 +652,9 @@ error:
   thd->wsrep_cs().reset_error();
   wsrep_after_command_ignore_result(thd);
   wsrep_close(thd);
-  if (thd->wsrep_nbo_notify_ctx)
+  if (thd->wsrep_nbo_ctx.notifier())
   {
-    thd->wsrep_nbo_notify_ctx->notify(apply_err);
-    thd->wsrep_nbo_notify_ctx= 0;
+    thd->wsrep_nbo_ctx.notify(apply_err);
   }
   server_threads.erase(thd);
   delete thd;

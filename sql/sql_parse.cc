@@ -5833,11 +5833,14 @@ wsrep_error_label:
 
 finish:
 #ifdef WITH_WSREP
-  int nbo_phase_two_failed= wsrep_nbo_phase_two_begin(thd);
-  if (nbo_phase_two_failed)
+  if (WSREP(thd))
   {
-    // we can't rollback the DDL, so we let it complete
-    res= true;
+    if (thd->wsrep_nbo_ctx.phase_two_error() ||
+        wsrep_nbo_phase_two_begin(thd))
+    {
+      // we can't rollback the DDL, so we let it complete
+      res= true;
+    }
   }
 #endif /* WITH_WSREP */
   thd->reset_query_timer();
@@ -5976,10 +5979,14 @@ finish:
   /* assume PA safety for next transaction */
   thd->wsrep_PA_safe= true;
 
-  if (nbo_phase_two_failed)
+  if (WSREP(thd) && thd->wsrep_nbo_ctx.phase_two_done())
   {
-    // node may be inconsistent, leave cluster
-    wsrep_stop_replication(thd, false);
+    if (thd->wsrep_nbo_ctx.phase_two_error())
+    {
+      // node may be inconsistent, leave cluster
+      wsrep_stop_replication(thd, false);
+    }
+    thd->wsrep_nbo_ctx.clear();
   }
 #endif /* WITH_WSREP */
 

@@ -286,6 +286,78 @@ private:
   bool m_notified;
 };
 
+struct Wsrep_nbo_context
+{
+  Wsrep_nbo_context() :
+    m_phase_one_notifier(NULL),
+    m_phase_two_done(false),
+    m_phase_two_error(false) { }
+
+  void clear()
+  {
+    assert(m_phase_one_notifier == 0);
+    m_phase_one_notifier= 0;
+    m_phase_two_done= false;
+    m_phase_two_error= false;
+  }
+
+  Wsrep_nbo_notify_context* notifier()
+  {
+    return m_phase_one_notifier;
+  }
+
+  void set_notifier(Wsrep_nbo_notify_context* notifier)
+  {
+    m_phase_one_notifier= notifier;
+  }
+
+  void notify(int apply_error)
+  {
+    assert(m_phase_one_notifier);
+    if (m_phase_one_notifier)
+    {
+      m_phase_one_notifier->notify(apply_error);
+      m_phase_one_notifier= 0;
+    }
+  }
+
+  void set_error(const wsrep::mutable_buffer& err)
+  {
+    assert(m_phase_one_notifier);
+    if (m_phase_one_notifier)
+    {
+      m_phase_one_notifier->set_error(err);
+    }
+  }
+
+  bool phase_two_done()
+  {
+    return m_phase_two_done;
+  }
+
+  void set_phase_two_done()
+  {
+    assert(!m_phase_two_done);
+    m_phase_two_done= true;
+  }
+
+  int phase_two_error()
+  {
+    return m_phase_two_error;
+  }
+
+  void set_phase_two_error(int error)
+  {
+    assert(m_phase_two_done);
+    m_phase_two_error= error;
+  }
+
+private:
+  Wsrep_nbo_notify_context* m_phase_one_notifier;
+  bool m_phase_two_done;
+  int m_phase_two_error;
+};
+
 /* Other global variables */
 extern wsrep_seqno_t wsrep_locked_seqno;
 #define WSREP_ON unlikely(WSREP_ON_)
