@@ -224,6 +224,9 @@ typedef st_spider_result SPIDER_RESULT;
 #define SPIDER_SQL_LOP_CHK_PRM_PRF_STR "spider_lc_"
 #define SPIDER_SQL_LOP_CHK_PRM_PRF_LEN (sizeof(SPIDER_SQL_LOP_CHK_PRM_PRF_STR) - 1)
 
+#define SPIDER_SQL_DATABASE_STR "database"
+#define SPIDER_SQL_DATABASE_LEN (sizeof(SPIDER_SQL_DATABASE_STR) - 1)
+
 #define SPIDER_CONN_KIND_MYSQL (1 << 0)
 #if defined(HS_HAS_SQLCOM) && defined(HAVE_HANDLERSOCKET)
 #define SPIDER_CONN_KIND_HS_READ (1 << 2)
@@ -967,6 +970,8 @@ public:
   virtual bool append_charset_name_before_string();
   virtual uint limit_mode();
 };
+
+#define SPIDER_IDENT_SPACE 64 * 4 + 2
 
 class spider_db_row
 {

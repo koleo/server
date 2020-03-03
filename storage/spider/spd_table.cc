@@ -143,6 +143,9 @@ extern SPIDER_DBTON spider_dbton_handlersocket;
 #ifdef HAVE_ORACLE_OCI
 extern SPIDER_DBTON spider_dbton_oracle;
 #endif
+#ifdef HAVE_SPIDER_UNIXODBC
+extern SPIDER_DBTON spider_dbton_odbc;
+#endif
 #ifndef WITHOUT_SPIDER_BG_SEARCH
 SPIDER_THREAD *spider_table_sts_threads;
 SPIDER_THREAD *spider_table_crd_threads;
@@ -7818,6 +7821,12 @@ int spider_db_init(
   spider_dbton_oracle.dbton_id = dbton_id;
   spider_dbton_oracle.db_util->dbton_id = dbton_id;
   spider_dbton[dbton_id] = spider_dbton_oracle;
+  ++dbton_id;
+#endif
+#ifdef HAVE_SPIDER_UNIXODBC
+  spider_dbton_odbc.dbton_id = dbton_id;
+  spider_dbton_odbc.db_util->dbton_id = dbton_id;
+  spider_dbton[dbton_id] = spider_dbton_odbc;
   ++dbton_id;
 #endif
   for (roop_count = 0; roop_count < SPIDER_DBTON_SIZE; roop_count++)
