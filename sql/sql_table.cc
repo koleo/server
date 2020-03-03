@@ -54,6 +54,7 @@
 #include "sql_audit.h"
 #include "sql_sequence.h"
 #include "tztime.h"
+#include "rpl_rli.h"
 #include <algorithm>
 
 #ifdef __WIN__
@@ -10929,7 +10930,17 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       found_count++;
     thd->get_stmt_da()->inc_current_row_for_warning();
   }
+  {
+    Relay_log_info rli(false);
+    rpl_group_info rgi(&rli);
+    RPL_TABLE_LIST rpl_table(to, TL_WRITE, from, copy, copy_end);
+    rgi.tables_to_lock= &rpl_table;
 
+    thd->rgi_fake->m_table_map.set_table(1, to);
+  }
+  // TODO read binlog
+
+  // TODO handle m_vers_from_plain
   THD_STAGE_INFO(thd, stage_enabling_keys);
   thd_progress_next_stage(thd);
 
