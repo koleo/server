@@ -880,7 +880,7 @@ public:
     return do_field_string;
   }
 
-  static void do_field_inet6_native_to_binary(Copy_field *copy)
+  static void do_field_inet6_native_to_binary(const Copy_field *copy)
   {
     NativeBufferInet6 res;
     copy->from_field->val_native(&res);

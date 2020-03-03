@@ -52,6 +52,7 @@ struct TABLE_LIST;
 class ACL_internal_schema_access;
 class ACL_internal_table_access;
 class Field;
+class Copy_field;
 class Table_statistics;
 class With_element;
 struct TDC_element;
@@ -2149,11 +2150,18 @@ struct TABLE_LIST
                      mdl_type, MDL_TRANSACTION);
   }
 
+  TABLE_LIST(const LEX_CSTRING *db_arg,
+             const LEX_CSTRING *table_name_arg,
+             const LEX_CSTRING *alias_arg,
+             enum thr_lock_type lock_type_arg)
+  {
+    init_one_table(db_arg, table_name_arg, alias_arg, lock_type_arg);
+  }
+
   TABLE_LIST(TABLE *table_arg, thr_lock_type lock_type)
+    : TABLE_LIST(&table_arg->s->db, &table_arg->s->table_name, NULL, lock_type)
   {
     DBUG_ASSERT(table_arg->s);
-    init_one_table(&table_arg->s->db, &table_arg->s->table_name,
-                   NULL, lock_type);
     table= table_arg;
     vers_conditions.name= table->s->vers.name;
   }

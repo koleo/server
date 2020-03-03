@@ -3399,7 +3399,7 @@ MYSQL_BIN_LOG::MYSQL_BIN_LOG(uint *sync_period)
     We don't want to initialize locks here as such initialization depends on
     safe_mutex (when using safe_mutex) which depends on MY_INIT(), which is
     called only in main(). Doing initialization here would make it happen
-    before main().
+    before main(). init_pthread_objects() can be called for that purpose.
   */
   index_file_name[0] = 0;
   bzero((char*) &index_file, sizeof(index_file));

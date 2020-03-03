@@ -56,6 +56,7 @@
 #include "sql_sequence.h"
 #include "tztime.h"
 #include "sql_insert.h"                        // binlog_drop_table
+#include "rpl_rli.h"
 #include <algorithm>
 
 #ifdef __WIN__
@@ -74,7 +75,7 @@ static int copy_data_between_tables(THD *, TABLE *,TABLE *,
                                     List<Create_field> &, bool, uint, ORDER *,
                                     ha_rows *, ha_rows *,
                                     Alter_info::enum_enable_or_disable,
-                                    Alter_table_ctx *);
+                                    Alter_table_ctx *, bool);
 static bool append_system_key_parts(THD *thd, HA_CREATE_INFO *create_info,
                                     Alter_info *alter_info, KEY **key_info,
                                     uint key_count);
@@ -5037,7 +5038,7 @@ handler *mysql_create_frm_image(THD *thd, const LEX_CSTRING &db,
     {
       if (key->type == Key::FOREIGN_KEY)
       {
-        my_error(ER_FEATURE_NOT_SUPPORTED_WITH_PARTITIONING, MYF(0), 
+        my_error(ER_FEATURE_NOT_SUPPORTED_WITH_PARTITIONING, MYF(0),
                  "FOREIGN KEY");
         goto err;
       }
@@ -10880,7 +10881,7 @@ do_continue:;
                                  alter_info->create_list, ignore,
                                  order_num, order, &copied, &deleted,
                                  alter_info->keys_onoff,
-                                 &alter_ctx))
+                                 &alter_ctx, order == NULL && !opt_bootstrap))
       goto err_new_table_cleanup;
   }
   else
@@ -11283,7 +11284,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 			 uint order_num, ORDER *order,
 			 ha_rows *copied, ha_rows *deleted,
                          Alter_info::enum_enable_or_disable keys_onoff,
-                         Alter_table_ctx *alter_ctx)
+                         Alter_table_ctx *alter_ctx, bool online)
 {
   int error= 1;
   Copy_field *copy= NULL, *copy_end;
@@ -11309,6 +11310,38 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 
   /* Two or 3 stages; Sorting, copying data and update indexes */
   thd_progress_init(thd, 2 + MY_TEST(order));
+
+  if (online)
+  {
+    MDL_ticket *mdl_ticket= from->mdl_ticket;
+    if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_EXCLUSIVE,
+                                             thd->variables.lock_wait_timeout))
+      DBUG_RETURN(1);
+
+    uint online_alter_sync_period= 0;
+    from->s->online_ater_binlog= new MYSQL_BIN_LOG(&online_alter_sync_period);
+    if (!from->s->online_ater_binlog)
+      DBUG_RETURN(1);
+    //TODO cleanup
+
+    from->s->online_ater_binlog->init_pthread_objects();
+
+    char log_name[FN_REFLEN];
+
+    // path to frm without extension
+    memcpy(log_name, from->s->normalized_path.str,
+           from->s->normalized_path.length - 4);
+    strncpy(log_name + from->s->normalized_path.length - 4,
+            STRING_WITH_LEN("-online-binglog"));
+    if (from->s->online_ater_binlog->open_index_file(NULL, log_name, TRUE) ||
+        from->s->online_ater_binlog->open(log_name, 0, 0, SEQ_READ_APPEND,
+                                          ULONG_MAX, 1, TRUE))
+      DBUG_RETURN(1);
+
+    if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_SHARED_READ,
+                                             thd->variables.lock_wait_timeout))
+      DBUG_RETURN(1);
+  }
 
   if (!(copy= new (thd->mem_root) Copy_field[to->s->fields]))
     DBUG_RETURN(-1);
@@ -11595,6 +11628,49 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     thd->get_stmt_da()->inc_current_row_for_warning();
   }
 
+  if (online && error == 0)
+  {
+    Relay_log_info rli(false);
+    rpl_group_info rgi(&rli);
+    RPL_TABLE_LIST rpl_table(to, TL_WRITE, from, copy, copy_end);
+    rgi.tables_to_lock= &rpl_table;
+
+    thd->rgi_fake->m_table_map.set_table(from->s->table_map_id, to);
+
+    auto *binlog= from->s->online_ater_binlog;
+    DBUG_ASSERT(binlog->is_open());
+
+    LOG_INFO linfo;
+    error= binlog->find_log_pos(&linfo, NULL, 1);
+    DBUG_ASSERT(error == 0); // TODO handle error
+
+    IO_CACHE log;
+    const char *errmsg;
+    File file= open_binlog(&log, linfo.log_file_name, &errmsg);
+    DBUG_ASSERT(file); // TODO handle
+
+    auto *description_event= new Format_description_log_event(3);
+    if (description_event == NULL)
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      goto err;
+    }
+
+    mysql_mutex_lock(binlog->get_log_lock()); // TODO decrease window
+
+    my_off_t scan_pos = BIN_LOG_HEADER_SIZE;
+    my_off_t pos = BIN_LOG_HEADER_SIZE;
+    while (scan_pos < pos)
+    {
+      auto ev= Log_event::read_log_event(&log, description_event, false);
+    }
+
+    mysql_mutex_unlock(binlog->get_log_lock());
+
+  }
+  // TODO read binlog
+
+  // TODO handle m_vers_from_plain
   THD_STAGE_INFO(thd, stage_enabling_keys);
   thd_progress_next_stage(thd);
 
