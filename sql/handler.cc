@@ -6296,11 +6296,34 @@ static int write_locked_table_maps(THD *thd)
   DBUG_RETURN(0);
 }
 
+static int binlog_log_row_online_alter(TABLE* table,
+                                       const uchar *before_record,
+                                       const uchar *after_record,
+                                       Log_func *log_func)
+{
+  if (!table->s->online_ater_binlog)
+    return 0;
+  
+  THD *thd= table->in_use;
+  
+  if (!table->online_alter_cache)
+    table->online_alter_cache= thd->binlog_setup_cache_data(&table->mem_root);
 
-static int binlog_log_row_internal(TABLE* table,
-                                   const uchar *before_record,
-                                   const uchar *after_record,
-                                   Log_func *log_func)
+  // this value can be important during error handling when flushing
+  // see flush_and_set_pending_rows_event and set_write_error of MYSQL_BIN_LOG
+  bool has_trans= table->file->has_transactions() ||
+                  thd->variables.option_bits & OPTION_GTID_BEGIN;
+  
+  int error= (*log_func)(thd, table, table->s->online_ater_binlog,
+                         table->online_alter_cache, has_trans,
+                         before_record, after_record);
+  return error ? HA_ERR_RBR_LOGGING_FAILED : 0;
+}
+
+static int binlog_log_row_to_binlog(TABLE* table,
+                                    const uchar *before_record,
+                                    const uchar *after_record,
+                                    Log_func *log_func)
 {
   bool error= 0;
   THD *const thd= table->in_use;
@@ -6355,7 +6378,12 @@ int binlog_log_row(TABLE* table, const uchar *before_record,
 
   if (!table->file->check_table_binlog_row_based(1))
     return 0;
-  return binlog_log_row_internal(table, before_record, after_record, log_func);
+  int error= binlog_log_row_to_binlog(table, before_record, after_record,
+                                      log_func);
+  if (!error)
+    error= binlog_log_row_online_alter(table, before_record, after_record,
+                                       log_func);
+  return error;
 }
 
 
