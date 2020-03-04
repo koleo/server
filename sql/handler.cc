@@ -6313,6 +6313,9 @@ static int binlog_log_row_internal(TABLE* table,
   if (likely(!(error= ((thd->get_binlog_table_maps() == 0 &&
                         write_locked_table_maps(thd))))))
   {
+    DBUG_ASSERT(thd->is_current_stmt_binlog_format_row());
+    DBUG_ASSERT((WSREP_NNULL(thd) && wsrep_emulate_bin_log) ||
+                mysql_bin_log.is_open());
     /*
       We need to have a transactional behavior for SQLCOM_CREATE_TABLE
       (i.e. CREATE TABLE... SELECT * FROM TABLE) in order to keep a
@@ -6322,8 +6325,15 @@ static int binlog_log_row_internal(TABLE* table,
       binlog.
     */
     bool const has_trans= thd->lex->sql_command == SQLCOM_CREATE_TABLE ||
-      table->file->has_transactions();
-    error= (*log_func)(thd, table, has_trans, before_record, after_record);
+            table->file->has_transactions() ||
+            thd->variables.option_bits & OPTION_GTID_BEGIN;
+
+    auto *cache_mngr= thd->binlog_setup_trx_data();
+    if (cache_mngr == NULL)
+      return HA_ERR_OUT_OF_MEM;
+
+    error= (*log_func)(thd, table, &mysql_bin_log, cache_mngr, has_trans,
+                       before_record, after_record);
   }
   return error ? HA_ERR_RBR_LOGGING_FAILED : 0;
 }
