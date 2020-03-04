@@ -63,6 +63,8 @@ class Range_rowid_filter_cost_info;
 class derived_handler;
 class Pushdown_derived;
 struct Name_resolution_context;
+class MYSQL_BIN_LOG;
+class binlog_cache_mngr;
 
 /*
   Used to identify NESTED_JOIN structures within a join (applicable only to
@@ -803,6 +805,8 @@ struct TABLE_SHARE
   plugin_ref default_part_plugin;
 #endif
 
+  MYSQL_BIN_LOG *online_ater_binlog;
+
   /**
     System versioning support.
   */
@@ -1430,6 +1434,8 @@ public:
     and can be useful for range optimizer.
   */
   Item *notnull_cond;
+
+  binlog_cache_mngr *online_alter_cache_mngr;
 
   inline void reset() { bzero((void*)this, sizeof(*this)); }
   void init(THD *thd, TABLE_LIST *tl);
