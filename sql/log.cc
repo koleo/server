@@ -2147,6 +2147,33 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
   PSI_stage_info org_stage;
   DBUG_ENTER("binlog_commit");
 
+  /* 
+    cache_mngr can be NULL in case if logging is disabled.
+    Still we can have online alter in process
+  */
+
+  for (TABLE *table= thd->open_tables; table;
+       table= table->next)
+  {
+    if (!table->online_alter_cache)
+      continue;
+    auto *binlog= table->s->online_ater_binlog;
+    DBUG_ASSERT(binlog);
+    
+    error= binlog_flush_pending_rows_event(thd, true, true,
+                                           binlog,
+                                           table->online_alter_cache);
+    if (unlikely(error))
+      DBUG_RETURN(error);
+
+    error= binlog->write_cache(thd, &table->online_alter_cache->cache_log);
+    if (error)
+    {
+      my_error(ER_ERROR_ON_WRITE, MYF(ME_ERROR_LOG), binlog->get_name(), errno);
+      DBUG_RETURN(error);
+    }
+  }
+  
   binlog_cache_mngr *const cache_mngr= thd->binlog_get_cache_mngr();
 
   if (!cache_mngr)
@@ -5728,6 +5755,17 @@ bool stmt_has_updated_non_trans_table(const THD* thd)
   These functions are placed in this file since they need access to
   binlog_hton, which has internal linkage.
 */
+
+binlog_cache_data *THD::binlog_setup_cache_data(MEM_ROOT *mem_root) 
+{
+  void *cache_buf= alloc_root(mem_root, sizeof(binlog_cache_data));
+  auto *cache= new (cache_buf)binlog_cache_data();
+  if (!cache ||
+      open_cached_file(&cache->cache_log, mysql_tmpdir,
+                       LOG_PREFIX, (size_t)binlog_cache_size, MYF(MY_WME)))
+    return NULL;
+  return cache;
+}
 
 binlog_cache_mngr *THD::binlog_setup_trx_data()
 {
@@ -11104,7 +11142,7 @@ void wsrep_thd_binlog_stmt_rollback(THD * thd)
   binlog_cache_mngr *const cache_mngr= thd->binlog_get_cache_mngr();
   if (cache_mngr)
   {
-    thd->binlog_remove_pending_rows_event(TRUE, TRUE);
+    MYSQL_BIN_LOG::remove_pending_rows_event(thd, &cache_mngr->trx_cache);
     cache_mngr->stmt_cache.reset();
   }
   DBUG_VOID_RETURN;

@@ -6651,15 +6651,38 @@ bool handler::check_table_binlog_row_based_internal()
                     (thd->variables.option_bits & OPTION_BIN_LOG) &&
                     mysql_bin_log.is_open()));
 }
-
-
-int handler::binlog_log_row(TABLE *table,
-                            const uchar *before_record,
-                            const uchar *after_record,
-                            Log_func *log_func)
+static int binlog_log_row_online_alter(TABLE* table,
+                                       const uchar *before_record,
+                                       const uchar *after_record,
+                                       Log_func *log_func,
+                                       bool has_trans)
 {
+  if (!table->s->online_ater_binlog)
+    return 0;
+
   THD *thd= table->in_use;
-  DBUG_ENTER("binlog_log_row");
+
+  if (!table->online_alter_cache)
+    table->online_alter_cache= thd->binlog_setup_cache_data(&table->mem_root);
+
+  int error= (*log_func)(thd, table, table->s->online_ater_binlog,
+                         table->online_alter_cache, has_trans,
+                         before_record, after_record);
+  return error ? HA_ERR_RBR_LOGGING_FAILED : 0;
+}
+
+
+
+static int binlog_log_row_to_binlog(TABLE* table,
+                                    const uchar *before_record,
+                                    const uchar *after_record,
+                                    Log_func *log_func,
+                                    bool has_trans)
+{
+  bool error= 0;
+  THD *const thd= table->in_use;
+
+  DBUG_ENTER("binlog_log_row_to_binlog");
 
   if (!thd->binlog_table_maps &&
       thd->binlog_write_table_maps())
@@ -6676,9 +6699,28 @@ int handler::binlog_log_row(TABLE *table,
   auto *cache= binlog_get_cache_data(cache_mngr,
                                      use_trans_cache(thd, has_trans));
 
-  bool error= (*log_func)(thd, table, &mysql_bin_log, cache,
-                          row_logging_has_trans, before_record, after_record);
-  DBUG_RETURN(error ? HA_ERR_RBR_LOGGING_FAILED : 0);
+    error= (*log_func)(thd, table, &mysql_bin_log, cache, has_trans,
+                       before_record, after_record);
+
+  return error ? HA_ERR_RBR_LOGGING_FAILED : 0;
+}
+
+int handler::binlog_log_row(TABLE *table,
+                            const uchar *before_record,
+                            const uchar *after_record,
+                            Log_func *log_func)
+{
+  DBUG_ENTER("handler::binlog_log_row");
+
+
+  if (!table->file->check_table_binlog_row_based())
+    DBUG_RETURN(0);
+  int error= binlog_log_row_to_binlog(table, before_record, after_record,
+                                      log_func, row_logging_has_trans);
+  if (!error)
+    error= binlog_log_row_online_alter(table, before_record, after_record,
+                                       log_func, row_logging_has_trans);
+  DBUG_RETURN(error);
 }
 
 

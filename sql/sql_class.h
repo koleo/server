@@ -2590,6 +2590,7 @@ public:
 
 #ifndef MYSQL_CLIENT
   binlog_cache_mngr *  binlog_setup_trx_data();
+  binlog_cache_data *  binlog_setup_cache_data(MEM_ROOT *mem_root);
 
   /*
     Public interface to write RBR events to the binlog
