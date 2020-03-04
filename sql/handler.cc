@@ -6331,8 +6331,10 @@ static int binlog_log_row_internal(TABLE* table,
     auto *cache_mngr= thd->binlog_setup_trx_data();
     if (cache_mngr == NULL)
       return HA_ERR_OUT_OF_MEM;
+    auto *cache= binlog_get_cache_data(cache_mngr,
+                                       use_trans_cache(thd, has_trans));
 
-    error= (*log_func)(thd, table, &mysql_bin_log, cache_mngr, has_trans,
+    error= (*log_func)(thd, table, &mysql_bin_log, cache, has_trans,
                        before_record, after_record);
   }
   return error ? HA_ERR_RBR_LOGGING_FAILED : 0;

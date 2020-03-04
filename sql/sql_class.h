@@ -2505,13 +2505,13 @@ public:
   int binlog_write_table_map(TABLE *table, bool is_transactional,
                              my_bool *with_annotate= 0);
   int binlog_write_row(TABLE* table, MYSQL_BIN_LOG *bin_log,
-                       binlog_cache_mngr *cache_mngr, bool is_transactional,
+                       binlog_cache_data *cache_data, bool is_transactional,
                        const uchar *buf);
   int binlog_delete_row(TABLE* table,  MYSQL_BIN_LOG *bin_log,
-                        binlog_cache_mngr *cache_mngr, bool is_transactional,
+                        binlog_cache_data *cache_data, bool is_transactional,
                         const uchar *buf);
   int binlog_update_row(TABLE* table, MYSQL_BIN_LOG *bin_log,
-                        binlog_cache_mngr *cache_mngr, bool is_transactional,
+                        binlog_cache_data *cache_data, bool is_transactional,
                         const uchar *old_data, const uchar *new_data);
   static void binlog_prepare_row_images(TABLE* table);
 
@@ -2521,14 +2521,12 @@ public:
     Member functions to handle pending event for row-level logging.
   */
   binlog_cache_mngr *binlog_get_cache_mngr() const;
-  void binlog_set_pending_rows_event(Rows_log_event* ev, bool use_trans_cache);
   inline int binlog_flush_pending_rows_event(bool stmt_end)
   {
     return (binlog_flush_pending_rows_event(stmt_end, FALSE) || 
             binlog_flush_pending_rows_event(stmt_end, TRUE));
   }
   int binlog_flush_pending_rows_event(bool stmt_end, bool is_transactional);
-  int binlog_remove_pending_rows_event(bool clear_maps, bool is_transactional);
 
   /**
     Determine the binlog format of the current statement.
