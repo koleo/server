@@ -375,6 +375,7 @@ void wsrep_sst_received (THD*                thd,
     {
       int const rcode(seqno < 0 ? seqno : 0);
       wsrep_sst_complete(thd,rcode);
+  wsrep_wait_until_innodb_initialized();
     }
 }
 

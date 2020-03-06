@@ -65,6 +65,9 @@
 #include "wsrep_var.h"            /* wsrep_hton_check() */
 #endif /* WITH_WSREP */
 
+/* for updating local_seqno if node is doing xarecovery after SST donation */
+extern wsrep_seqno_t local_seqno;
+
 /**
   @def MYSQL_TABLE_LOCK_WAIT
   Instrumentation helper for table io_waits.
@@ -7490,6 +7493,14 @@ int ha_abort_transaction(THD *bf_thd, THD *victim_thd, my_bool signal)
 
   DBUG_RETURN(0);
 }
+
+#ifdef WITH_WSREP
+void wsrep_wait_until_innodb_initialized()
+{
+  handlerton *hton= installed_htons[DB_TYPE_INNODB];
+  if (hton)  hton->wait_until_initialized(hton);
+}
+#endif /* WITH_WSREP */
 #endif /* WITH_WSREP */
 
 
