@@ -1,3 +1,7 @@
+create table t (id int primary key, x NULL, UNIQUE(x)) engine=innodb;
+show create table t;
+drop table t;
+
 create table t (id int primary key, s date, e date, period for mytime(s,e));
 --echo # CONSTRAINT CHECK (s < e) is added implicitly, and shouldn't be shown
 --echo # this is important for correct command-based replication

@@ -1,0 +1,24 @@
+
+-- source include/have_log_bin.inc
+-- source include/not_embedded.inc
+-- source include/have_innodb.inc
+
+
+set binlog_format=row;
+
+reset master;
+
+create table t1 (a int) engine=innodb;
+create table t2 (a int) engine=innodb;
+FLUSH LOGS;
+begin;
+insert t1 values (5);
+commit;
+begin;
+insert t2 values (5);
+commit;
+
+SHOW BINLOG EVENTS;
+SHOW BINLOG EVENTS in 'master-bin.000002';
+
+drop table t1, t2;
