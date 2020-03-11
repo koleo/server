@@ -3179,6 +3179,7 @@ Sys_secure_auth(
        GLOBAL_VAR(opt_secure_auth), CMD_LINE(OPT_ARG),
        DEFAULT(TRUE));
 
+
 static bool check_require_secure_transport(sys_var *self, THD *thd, set_var *var)
 {
 #ifndef _WIN32
