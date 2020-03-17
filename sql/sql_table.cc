@@ -9414,6 +9414,7 @@ bool mysql_alter_table(THD *thd, const LEX_CSTRING *new_db,
                        uint order_num, ORDER *order, bool ignore)
 {
   bool engine_changed;
+  bool online= order == NULL && !opt_bootstrap;
   DBUG_ENTER("mysql_alter_table");
 
   /*
@@ -10191,10 +10192,13 @@ do_continue:;
 
     /*
       Otherwise upgrade to SHARED_NO_WRITE.
+      In case if ONLINE possible, upgrade to SHARED_READ instead.
       Note that under LOCK TABLES, we will already have SHARED_NO_READ_WRITE.
     */
     if (alter_info->requested_lock != Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE &&
-        thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_SHARED_NO_WRITE,
+        thd->mdl_context.upgrade_shared_lock(mdl_ticket,
+                                             online ? MDL_SHARED_READ
+                                                    : MDL_SHARED_NO_WRITE,
                                              thd->variables.lock_wait_timeout))
       goto err_new_table_cleanup;
 
@@ -10257,7 +10261,7 @@ do_continue:;
                                  alter_info->create_list, ignore,
                                  order_num, order, &copied, &deleted,
                                  alter_info->keys_onoff,
-                                 &alter_ctx, order == NULL && !opt_bootstrap))
+                                 &alter_ctx, online))
     {
       goto err_new_table_cleanup;
     }
@@ -10616,6 +10620,19 @@ bool mysql_trans_commit_alter_copy_data(THD *thd)
   DBUG_RETURN(error);
 }
 
+class My_mutex_scope
+{
+  mysql_mutex_t *mutex;
+public:
+  My_mutex_scope(mysql_mutex_t *mutex): mutex(mutex)
+  {
+    mysql_mutex_lock(mutex);
+  }
+  ~My_mutex_scope()
+  {
+    mysql_mutex_unlock(mutex);
+  }
+};
 
 static int
 copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
@@ -10658,7 +10675,9 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       DBUG_RETURN(1);
 
     uint online_alter_sync_period= 0;
-    from->s->online_ater_binlog= new MYSQL_BIN_LOG(&online_alter_sync_period);
+    from->s->online_ater_binlog= new (alloc_root(&from->s->mem_root,
+                                                 sizeof (MYSQL_BIN_LOG)))
+                                 MYSQL_BIN_LOG(&online_alter_sync_period);
     if (!from->s->online_ater_binlog)
       DBUG_RETURN(1);
     //TODO cleanup
@@ -10672,13 +10691,19 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
            from->s->normalized_path.length - 4);
     strncpy(log_name + from->s->normalized_path.length - 4,
             STRING_WITH_LEN("-online-binglog"));
-    if (from->s->online_ater_binlog->open_index_file(NULL, log_name, TRUE) ||
-        from->s->online_ater_binlog->open(log_name, 0, 0, SEQ_READ_APPEND,
-                                          ULONG_MAX, 1, TRUE))
+
+    mysql_mutex_lock(from->s->online_ater_binlog->get_log_lock());
+    error= from->s->online_ater_binlog->open_index_file(NULL, log_name, TRUE) ||
+           from->s->online_ater_binlog->open(log_name, 0, 0, SEQ_READ_APPEND,
+                                             ULONG_MAX, 1, TRUE);
+    mysql_mutex_unlock(from->s->online_ater_binlog->get_log_lock());
+
+    if (error)
       DBUG_RETURN(1);
 
     if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_SHARED_READ,
-                                             thd->variables.lock_wait_timeout))
+                                             thd->variables.lock_wait_timeout,
+                                             true))
       DBUG_RETURN(1);
   }
 
@@ -10835,6 +10860,8 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   if (!ignore) /* for now, InnoDB needs the undo log for ALTER IGNORE */
     to->file->extra(HA_EXTRA_BEGIN_ALTER_COPY);
 
+  DEBUG_SYNC(thd, "alter_table_copy_start");
+
   while (likely(!(error= info.read_record())))
   {
     if (unlikely(thd->killed))
@@ -10963,6 +10990,8 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     thd->get_stmt_da()->inc_current_row_for_warning();
   }
 
+  DEBUG_SYNC(thd, "alter_table_copy_end");
+
   if (online && error == 0)
   {
     Relay_log_info rli(false);
@@ -10970,7 +10999,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     RPL_TABLE_LIST rpl_table(to, TL_WRITE, from, copy, copy_end);
     rgi.tables_to_lock= &rpl_table;
 
-    thd->rgi_fake->m_table_map.set_table(from->s->table_map_id, to);
+    rgi.m_table_map.set_table(from->s->table_map_id, to);
 
     auto *binlog= from->s->online_ater_binlog;
     DBUG_ASSERT(binlog->is_open());
@@ -10984,20 +11013,13 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     File file= open_binlog(&log, linfo.log_file_name, &errmsg);
     DBUG_ASSERT(file); // TODO handle
 
-    auto *description_event= new Format_description_log_event(3);
-    if (description_event == NULL)
-    {
-      my_error(ER_OUT_OF_RESOURCES, MYF(0));
-      goto err;
-    }
+    Format_description_log_event description_event(4);
 
     mysql_mutex_lock(binlog->get_log_lock()); // TODO decrease window
 
-    my_off_t scan_pos = BIN_LOG_HEADER_SIZE;
-    my_off_t pos = BIN_LOG_HEADER_SIZE;
-    while (scan_pos < pos)
+    while (auto *ev= Log_event::read_log_event(&log, &description_event, false))
     {
-      auto ev= Log_event::read_log_event(&log, description_event, false);
+      ev->apply_event(&rgi);
     }
 
     mysql_mutex_unlock(binlog->get_log_lock());

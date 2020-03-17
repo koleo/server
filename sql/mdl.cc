@@ -2496,7 +2496,8 @@ err:
 bool
 MDL_context::upgrade_shared_lock(MDL_ticket *mdl_ticket,
                                  enum_mdl_type new_type,
-                                 double lock_wait_timeout)
+                                 double lock_wait_timeout,
+                                 bool downgrade)
 {
   MDL_request mdl_xlock_request;
   MDL_savepoint mdl_svp= mdl_savepoint();
@@ -2517,7 +2518,7 @@ MDL_context::upgrade_shared_lock(MDL_ticket *mdl_ticket,
     has_stronger_or_equal_type(), the latter effectively blocks
     new MDL_BACKUP_DML while the former doesn't.
   */
-  if (mdl_ticket->has_stronger_or_equal_type(new_type) &&
+  if (!downgrade && mdl_ticket->has_stronger_or_equal_type(new_type) &&
       mdl_ticket->get_key()->mdl_namespace() != MDL_key::BACKUP)
     DBUG_RETURN(FALSE);
 

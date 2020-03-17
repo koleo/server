@@ -6,6 +6,9 @@
 
 set binlog_format=row;
 
+--connect (con2, localhost, root,,)
+--connection default
+
 reset master;
 
 create table t1 (a int) engine=innodb;
@@ -20,5 +23,23 @@ commit;
 
 SHOW BINLOG EVENTS;
 SHOW BINLOG EVENTS in 'master-bin.000002';
+
+
+--connection con2
+--send
+set debug_sync= 'now WAIT_FOR ended';
+
+--connection default
+set debug_sync= 'alter_table_copy_end SIGNAL ended WAIT_FOR end';
+
+--send alter table t1 add column b int, algorithm= copy;
+
+--connection con2
+--reap
+insert into t1 values (123), (456), (789);
+set debug_sync= 'now SIGNAL end';
+
+--connection default
+--reap
 
 drop table t1, t2;
