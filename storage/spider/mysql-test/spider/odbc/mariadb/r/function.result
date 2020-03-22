@@ -1,0 +1,166 @@
+for master_1
+for child2
+child2_1
+child2_2
+child2_3
+for child3
+
+drop and create databases
+connection master_1;
+DROP DATABASE IF EXISTS auto_test_local;
+CREATE DATABASE auto_test_local;
+USE auto_test_local;
+SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"')
+1
+SELECT spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"') ;
+SELECT spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"')
+1
+spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"')
+1
+SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"')
+1
+SELECT spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"') ;
+SELECT spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"')
+1
+spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"')
+1
+
+test select 1
+connection master_1;
+SELECT 1;
+1
+1
+
+in()
+connection master_1;
+CREATE TABLE t1 (
+a VARCHAR(255),
+PRIMARY KEY(a)
+) MASTER_1_ENGINE MASTER_1_CHARSET3 MASTER_1_COMMENT_TEXT_PK1_1
+insert into t1 values ('1');
+insert into t1 select a + 1 from t1;
+insert into t1 select a + 2 from t1;
+insert into t1 select a + 4 from t1;
+insert into t1 select a + 8 from t1;
+insert into t1 select a + 16 from t1;
+insert into t1 select a + 32 from t1;
+insert into t1 select a + 64 from t1;
+insert into t1 select a + 128 from t1;
+insert into t1 select a + 256 from t1;
+insert into t1 select a + 512 from t1;
+flush tables;
+connection master_1;
+select a from t1 where a in ('15', '120');
+a
+120
+15
+
+date_sub()
+connection master_1;
+DROP TABLE IF EXISTS ta_l;
+CREATE TABLE ta_l (
+a INT,
+b CHAR(1),
+c DATETIME,
+PRIMARY KEY(a)
+) MASTER_1_ENGINE MASTER_1_CHARSET MASTER_1_COMMENT_2_1
+INSERT INTO ta_l (a, b, c) VALUES
+(1, 'a', '2008-08-01 10:21:39'),
+(2, 'b', '2000-01-01 00:00:00'),
+(3, 'e', '2007-06-04 20:03:11'),
+(4, 'd', '2003-11-30 05:01:03'),
+(5, 'c', '2001-12-31 23:59:59');
+SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
+a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
+1	a	2008-08-01 00:00:00
+2	b	2000-01-01 00:00:00
+3	e	2007-06-04 00:00:00
+4	d	2003-11-30 00:00:00
+5	c	2001-12-31 00:00:00
+UPDATE ta_l SET c = DATE_SUB(c, INTERVAL 1 YEAR);
+SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
+a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
+1	a	2007-08-01 00:00:00
+2	b	1999-01-01 00:00:00
+3	e	2006-06-04 00:00:00
+4	d	2002-11-30 00:00:00
+5	c	2000-12-31 00:00:00
+UPDATE ta_l SET c = DATE_ADD(c, INTERVAL 1 QUARTER);
+SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
+a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
+1	a	2007-11-01 00:00:00
+2	b	1999-04-01 00:00:00
+3	e	2006-09-04 00:00:00
+4	d	2003-02-28 00:00:00
+5	c	2001-03-31 00:00:00
+UPDATE ta_l SET c = DATE_SUB(c, INTERVAL 1 MONTH);
+SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
+a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
+1	a	2007-10-01 00:00:00
+2	b	1999-03-01 00:00:00
+3	e	2006-08-04 00:00:00
+4	d	2003-01-28 00:00:00
+5	c	2001-02-28 00:00:00
+UPDATE ta_l SET c = DATE_ADD(c, INTERVAL 1 WEEK);
+SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
+a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
+1	a	2007-10-08 00:00:00
+2	b	1999-03-08 00:00:00
+3	e	2006-08-11 00:00:00
+4	d	2003-02-04 00:00:00
+5	c	2001-03-07 00:00:00
+UPDATE ta_l SET c = DATE_SUB(c, INTERVAL 1 DAY);
+SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
+a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
+1	a	2007-10-07 00:00:00
+2	b	1999-03-07 00:00:00
+3	e	2006-08-10 00:00:00
+4	d	2003-02-03 00:00:00
+5	c	2001-03-06 00:00:00
+UPDATE ta_l SET c = DATE_ADD(c, INTERVAL 1 HOUR);
+SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
+a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
+1	a	2007-10-07 00:00:00
+2	b	1999-03-07 00:00:00
+3	e	2006-08-10 00:00:00
+4	d	2003-02-03 00:00:00
+5	c	2001-03-06 00:00:00
+UPDATE ta_l SET c = DATE_SUB(c, INTERVAL 1 MINUTE);
+SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
+a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
+1	a	2007-10-06 00:00:00
+2	b	1999-03-06 00:00:00
+3	e	2006-08-09 00:00:00
+4	d	2003-02-02 00:00:00
+5	c	2001-03-05 00:00:00
+UPDATE ta_l SET c = DATE_ADD(c, INTERVAL 1 SECOND);
+connection master_1;
+SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
+a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
+1	a	2007-10-06 00:00:00
+2	b	1999-03-06 00:00:00
+3	e	2006-08-09 00:00:00
+4	d	2003-02-02 00:00:00
+5	c	2001-03-05 00:00:00
+
+deinit
+connection master_1;
+DROP DATABASE IF EXISTS auto_test_local;
+SELECT spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"')
+1
+SELECT spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"')
+1
+for child3
+for child2
+child2_3
+child2_2
+child2_1
+for master_1
+
+end of test

@@ -124,9 +124,9 @@ recovery test
 connection master_1;
 ALTER TABLE ta_l2
 PARTITION BY KEY(a) (
-PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", tbl "ta_r ta_r3",
+PARTITION pt1 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote2", tbl "ta_r ta_r3",
     priority "1000"',
-PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", tbl "ta_r2 ta_r4",
+PARTITION pt2 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote3", tbl "ta_r2 ta_r4",
     priority "1000001", lst "0 2"'
   );
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables
@@ -142,9 +142,9 @@ spider_copy_tables('ta_l2#P#pt2', '0', '1')
 connection master_1;
 ALTER TABLE ta_l2
 PARTITION BY KEY(a) (
-PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", tbl "ta_r ta_r3",
+PARTITION pt1 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote2", tbl "ta_r ta_r3",
     priority "1000"',
-PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", tbl "ta_r2 ta_r4",
+PARTITION pt2 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote3", tbl "ta_r2 ta_r4",
     priority "1000001", lst "0 1"'
   );
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables
@@ -233,9 +233,9 @@ recovery test
 connection master_1;
 ALTER TABLE ta_l2
 PARTITION BY KEY(a) (
-PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", tbl "ta_r ta_r3",
+PARTITION pt1 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote2", tbl "ta_r ta_r3",
     priority "1000"',
-PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", tbl "ta_r2 ta_r4",
+PARTITION pt2 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote3", tbl "ta_r2 ta_r4",
     priority "1000001", lst "1 0"'
   );
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables

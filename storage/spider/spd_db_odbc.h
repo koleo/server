@@ -18,6 +18,43 @@
 #include "sql.h"
 #include "sqlext.h"
 
+#define HAVE_SPIDER_ODBC
+
+#define SPIDER_DB_DIRECTORY_STR "directory"
+#define SPIDER_DB_DIRECTORY_LEN (sizeof(SPIDER_DB_DIRECTORY_STR) - 1)
+
+#define SPIDER_SQL_UID_STR "uid"
+#define SPIDER_SQL_UID_LEN (sizeof(SPIDER_SQL_UID_STR) - 1)
+#define SPIDER_SQL_PWD_STR "pwd"
+#define SPIDER_SQL_PWD_LEN (sizeof(SPIDER_SQL_PWD_STR) - 1)
+
+#define SPIDER_SQL_ODBC_EQUAL_STR "="
+#define SPIDER_SQL_ODBC_EQUAL_LEN (sizeof(SPIDER_SQL_ODBC_EQUAL_STR) - 1)
+
+int spider_odbc_init();
+int spider_odbc_deinit();
+spider_db_share *spider_odbc_create_share(
+  SPIDER_SHARE *share
+);
+spider_db_handler *spider_odbc_create_handler(
+  ha_spider *spider,
+  spider_db_share *db_share
+);
+spider_db_copy_table *spider_odbc_create_copy_table(
+  spider_db_share *db_share
+);
+SPIDER_DB_CONN *spider_odbc_create_conn(
+  SPIDER_CONN *conn
+);
+bool spider_odbc_support_direct_join();
+int spider_db_odbc_get_error(
+  SQLRETURN ret,
+  SQLSMALLINT hnd_type,
+  SQLHANDLE hnd,
+  SPIDER_CONN *conn,
+  char *stored_error_msg
+);
+
 class spider_db_odbc_util: public spider_db_util
 {
 public:
@@ -25,7 +62,12 @@ public:
   const char *value_quote;
   uint name_quote_length;
   uint value_quote_length;
-  spider_db_odbc_util();
+  spider_db_odbc_util(
+    const char *nm_quote,
+    const char *val_quote,
+    uint nm_quote_length,
+    uint val_quote_length
+  );
   virtual ~spider_db_odbc_util();
   int append_name(
     spider_string *str,
@@ -106,7 +148,7 @@ public:
   int append_lock_table_head(
     spider_string *str
   );
-  int append_lock_table_body(
+  virtual int append_lock_table_body(
     spider_string *str,
     const char *db_name,
     uint db_name_length,
@@ -116,10 +158,10 @@ public:
     CHARSET_INFO *table_name_charset,
     int lock_type
   );
-  int append_lock_table_tail(
+  virtual int append_lock_table_tail(
     spider_string *str
   );
-  int append_unlock_table(
+  virtual int append_unlock_table(
     spider_string *str
   );
   int open_item_func(
@@ -261,6 +303,8 @@ public:
 
 class spider_db_odbc_result: public spider_db_result
 {
+protected:
+  SQLHSTMT            hstm;
 public:
   spider_db_odbc_row  row;
   SQLSMALLINT         field_count;
@@ -278,7 +322,7 @@ public:
   int init();
   void set_limit(longlong value);
   bool has_result();
-  void free_result();
+  virtual void free_result();
   SPIDER_DB_ROW *current_row();
   SPIDER_DB_ROW *fetch_row();
   SPIDER_DB_ROW *fetch_row_from_result_buffer(
@@ -352,14 +396,15 @@ public:
   ulong          handler_open_array_line_no;
   longlong       limit;
   spider_db_odbc(
-    SPIDER_CONN *conn
+    SPIDER_CONN *conn,
+    spider_db_odbc_util *db_util
   );
   virtual ~spider_db_odbc();
   int init();
   void set_limit(longlong value);
   bool is_connected();
   void bg_connect();
-  int connect(
+  virtual int connect(
     char *tgt_host,
     char *tgt_username,
     char *tgt_password,
@@ -371,9 +416,9 @@ public:
   );
   int ping();
   void bg_disconnect();
-  void disconnect();
+  virtual void disconnect();
   int set_net_timeout();
-  int exec_query(
+  virtual int exec_query(
     const char *query,
     uint length,
     int quick_mode
@@ -392,12 +437,12 @@ public:
   int print_warnings(
     struct tm *l_time
   );
-  spider_db_result *store_result(
+  virtual spider_db_result *store_result(
     spider_db_result_buffer **spider_res_buf,
     st_spider_db_request_key *request_key,
     int *error_num
   );
-  spider_db_result *use_result(
+  virtual spider_db_result *use_result(
     st_spider_db_request_key *request_key,
     int *error_num
   );
@@ -544,7 +589,7 @@ public:
     size_t from_length
   );
   bool have_lock_table_list();
-  int append_lock_tables(
+  virtual int append_lock_tables(
     spider_string *str
   );
   int append_unlock_tables(
@@ -586,7 +631,8 @@ public:
   int                first_all_link_idx;
 
   spider_odbc_share(
-    st_spider_share *share
+    st_spider_share *share,
+    spider_db_odbc_util *db_util
   );
   virtual ~spider_odbc_share();
   int init();
@@ -695,7 +741,8 @@ public:
   longlong                limit;
   spider_odbc_handler(
     ha_spider *spider,
-    spider_odbc_share *share
+    spider_odbc_share *share,
+    spider_db_odbc_util *db_util
   );
   virtual ~spider_odbc_handler();
   int init();
@@ -979,7 +1026,7 @@ public:
   int append_match_where(
     spider_string *str
   );
-  int append_update_where(
+  virtual int append_update_where(
     spider_string *str,
     const TABLE *table,
     my_ptrdiff_t ptr_diff
@@ -1102,7 +1149,7 @@ public:
   int append_select_lock_part(
     ulong sql_type
   );
-  int append_select_lock(
+  virtual int append_select_lock(
     spider_string *str
   );
   int append_union_all_start_part(
@@ -1410,7 +1457,7 @@ public:
     key_range *end_key,
     int link_idx
   );
-  int lock_tables(
+  virtual int lock_tables(
     int link_idx
   );
   int unlock_tables(
@@ -1563,7 +1610,8 @@ public:
   longlong                offset;
   longlong                limit;
   spider_odbc_copy_table(
-    spider_odbc_share *db_share
+    spider_odbc_share *db_share,
+    spider_db_odbc_util *db_util
   );
   virtual ~spider_odbc_copy_table();
   int init();
@@ -1601,7 +1649,7 @@ public:
   int append_into_str();
   int append_open_paren_str();
   int append_values_str();
-  int append_select_lock_str(
+  virtual int append_select_lock_str(
     int lock_mode
   );
   int exec_query(

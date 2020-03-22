@@ -59,18 +59,7 @@ extern HASH spider_open_connections;
 extern SPIDER_DBTON spider_dbton[SPIDER_DBTON_SIZE];
 extern const char spider_dig_upper[];
 
-spider_db_odbc_util spider_db_odbc_utility;
-
-#define SPIDER_DB_DIRECTORY_STR "directory"
-#define SPIDER_DB_DIRECTORY_LEN (sizeof(SPIDER_DB_DIRECTORY_STR) - 1)
-
-#define SPIDER_SQL_UID_STR "uid"
-#define SPIDER_SQL_UID_LEN (sizeof(SPIDER_SQL_UID_STR) - 1)
-#define SPIDER_SQL_PWD_STR "pwd"
-#define SPIDER_SQL_PWD_LEN (sizeof(SPIDER_SQL_PWD_STR) - 1)
-
-#define SPIDER_SQL_ODBC_EQUAL_STR "="
-#define SPIDER_SQL_ODBC_EQUAL_LEN (sizeof(SPIDER_SQL_ODBC_EQUAL_STR) - 1)
+spider_db_odbc_util spider_db_odbc_utility("\"", "'", 1, 1);
 
 #define SPIDER_SQL_ODBC_TYPE_BINARY_STR "sql_binary"
 #define SPIDER_SQL_ODBC_TYPE_BINARY_LEN (sizeof(SPIDER_SQL_ODBC_TYPE_BINARY_STR) - 1)
@@ -377,7 +366,7 @@ spider_db_share *spider_odbc_create_share(
   SPIDER_SHARE *share
 ) {
   DBUG_ENTER("spider_odbc_create_share");
-  DBUG_RETURN(new spider_odbc_share(share));
+  DBUG_RETURN(new spider_odbc_share(share, &spider_db_odbc_utility));
 }
 
 spider_db_handler *spider_odbc_create_handler(
@@ -386,7 +375,7 @@ spider_db_handler *spider_odbc_create_handler(
 ) {
   DBUG_ENTER("spider_odbc_create_handler");
   DBUG_RETURN(new spider_odbc_handler(spider,
-    (spider_odbc_share *) db_share));
+    (spider_odbc_share *) db_share, &spider_db_odbc_utility));
 }
 
 spider_db_copy_table *spider_odbc_create_copy_table(
@@ -394,18 +383,18 @@ spider_db_copy_table *spider_odbc_create_copy_table(
 ) {
   DBUG_ENTER("spider_odbc_create_copy_table");
   DBUG_RETURN(new spider_odbc_copy_table(
-    (spider_odbc_share *) db_share));
+    (spider_odbc_share *) db_share, &spider_db_odbc_utility));
 }
 
 SPIDER_DB_CONN *spider_odbc_create_conn(
   SPIDER_CONN *conn
 ) {
   DBUG_ENTER("spider_odbc_create_conn");
-  DBUG_RETURN(new spider_db_odbc(conn));
+  DBUG_RETURN(new spider_db_odbc(conn, &spider_db_odbc_utility));
 }
 
-bool spider_odbc_support_direct_join(
-) {
+bool spider_odbc_support_direct_join()
+{
   DBUG_ENTER("spider_odbc_support_direct_join");
   DBUG_RETURN(FALSE);
 }
@@ -427,7 +416,7 @@ SPIDER_DBTON spider_dbton_odbc = {
   &spider_db_odbc_utility
 };
 
-static int spider_db_odbc_get_error(
+int spider_db_odbc_get_error(
   SQLRETURN ret,
   SQLSMALLINT hnd_type,
   SQLHANDLE hnd,
@@ -762,12 +751,13 @@ uint spider_db_odbc_row::get_byte_size()
 spider_db_odbc_result::spider_db_odbc_result(
   SPIDER_DB_CONN *in_db_conn
 ) : spider_db_result(in_db_conn),
+  hstm(((spider_db_odbc *) in_db_conn)->hstm),
   row(in_db_conn->dbton_id), field_count(0), spider(NULL), buf(NULL),
   len(NULL), null(NULL), stored_error_num(0)
 {
   DBUG_ENTER("spider_db_odbc_result::spider_db_odbc_result");
   DBUG_PRINT("info",("spider this=%p", this));
-  DBUG_PRINT("info",("spider hstm:%p", ((spider_db_odbc *) db_conn)->hstm));
+  DBUG_PRINT("info",("spider hstm:%p", hstm));
   DBUG_VOID_RETURN;
 }
 
@@ -775,7 +765,7 @@ spider_db_odbc_result::~spider_db_odbc_result()
 {
   DBUG_ENTER("spider_db_odbc_result::~spider_db_odbc_result");
   DBUG_PRINT("info",("spider this=%p", this));
-  if (((spider_db_odbc *) db_conn)->hstm)
+  if (hstm)
   {
     free_result();
   }
@@ -795,11 +785,11 @@ int spider_db_odbc_result::init()
   SQLRETURN ret;
   DBUG_ENTER("spider_db_odbc_result::init");
   DBUG_PRINT("info",("spider this=%p", this));
-  ret = SQLNumResultCols(((spider_db_odbc *) db_conn)->hstm, &field_count);
+  ret = SQLNumResultCols(hstm, &field_count);
   if (ret != SQL_SUCCESS)
   {
     DBUG_RETURN(spider_db_odbc_get_error(ret, SQL_HANDLE_STMT,
-      ((spider_db_odbc *) db_conn)->hstm, db_conn->conn, stored_error_msg));
+      hstm, db_conn->conn, stored_error_msg));
   }
   DBUG_PRINT("info",("spider field_count=%u", field_count));
   if (!spider_bulk_malloc(spider_current_trx, 275, MYF(MY_WME),
@@ -839,7 +829,7 @@ bool spider_db_odbc_result::has_result()
 {
   DBUG_ENTER("spider_db_odbc_result::has_result");
   DBUG_PRINT("info",("spider this=%p", this));
-  DBUG_RETURN(((spider_db_odbc *) db_conn)->hstm);
+  DBUG_RETURN(hstm);
 }
 
 void spider_db_odbc_result::free_result()
@@ -847,17 +837,16 @@ void spider_db_odbc_result::free_result()
   SQLRETURN ret;
   DBUG_ENTER("spider_db_odbc_result::free_result");
   DBUG_PRINT("info",("spider this=%p", this));
-  SQLHSTMT hstm = ((spider_db_odbc *) db_conn)->hstm;
   if (hstm)
   {
-    ret = SQLCloseCursor(hstm);
+    ret = SQLFreeStmt(hstm, SQL_CLOSE);
     if (ret != SQL_SUCCESS)
     {
       stored_error_num = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT,
         hstm, db_conn->conn, stored_error_msg);
     }
     SQLFreeHandle(SQL_HANDLE_STMT, hstm);
-    ((spider_db_odbc *) db_conn)->hstm = NULL;
+    hstm = NULL;
   }
   DBUG_VOID_RETURN;
 }
@@ -874,13 +863,13 @@ SPIDER_DB_ROW *spider_db_odbc_result::fetch_row()
   SQLRETURN ret;
   DBUG_ENTER("spider_db_odbc_result::fetch_row");
   DBUG_PRINT("info",("spider this=%p", this));
-  DBUG_PRINT("info",("spider hstm:%p", ((spider_db_odbc *) db_conn)->hstm));
+  DBUG_PRINT("info",("spider hstm:%p", hstm));
   SQLLEN buf_sz = spider && spider->share ?
     spider_param_buffer_size(spider->wide_handler->trx->thd,
       spider->share->buffer_size) :
     spider_param_buffer_size(current_thd, 16000), sz;
   row.record_size = 0;
-  ret = SQLFetch(((spider_db_odbc *) db_conn)->hstm);
+  ret = SQLFetch(hstm);
   if (ret != SQL_SUCCESS)
   {
     if (ret == SQL_NO_DATA)
@@ -888,7 +877,7 @@ SPIDER_DB_ROW *spider_db_odbc_result::fetch_row()
       stored_error_num = HA_ERR_END_OF_FILE;
     } else {
       stored_error_num = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT,
-        ((spider_db_odbc *) db_conn)->hstm, db_conn->conn, stored_error_msg);
+        hstm, db_conn->conn, stored_error_msg);
     }
     DBUG_RETURN(NULL);
   }
@@ -904,12 +893,12 @@ SPIDER_DB_ROW *spider_db_odbc_result::fetch_row()
       DBUG_RETURN(NULL);
     }
     DBUG_PRINT("info",("spider i:%u", i));
-    ret = SQLGetData(((spider_db_odbc *) db_conn)->hstm, i + 1, SQL_C_CHAR,
+    ret = SQLGetData(hstm, i + 1, SQL_C_CHAR,
       (char *) b->ptr(), buf_sz, &sz);
     if (ret != SQL_SUCCESS)
     {
       stored_error_num = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT,
-        ((spider_db_odbc *) db_conn)->hstm, db_conn->conn, stored_error_msg);
+        hstm, db_conn->conn, stored_error_msg);
       DBUG_RETURN(NULL);
     }
     if (sz == SQL_NULL_DATA)
@@ -929,12 +918,12 @@ SPIDER_DB_ROW *spider_db_odbc_result::fetch_row()
         DBUG_RETURN(NULL);
       }
       DBUG_PRINT("info",("spider length:%u", b->length()));
-      ret = SQLGetData(((spider_db_odbc *) db_conn)->hstm, i + 1, SQL_C_CHAR,
+      ret = SQLGetData(hstm, i + 1, SQL_C_CHAR,
         (char *) b->ptr() + b->length(), buf_sz, &sz);
       if (ret != SQL_SUCCESS)
       {
         stored_error_num = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT,
-          ((spider_db_odbc *) db_conn)->hstm, db_conn->conn, stored_error_msg);
+          hstm, db_conn->conn, stored_error_msg);
         DBUG_RETURN(NULL);
       }
       b->length(b->length() + sz);
@@ -1049,11 +1038,11 @@ longlong spider_db_odbc_result::num_rows()
   DBUG_ENTER("spider_db_odbc_result::num_rows");
   DBUG_PRINT("info",("spider this=%p", this));
 /*
-  ret = SQLRowCount(((spider_db_odbc *) db_conn)->hstm, &cnt);
+  ret = SQLRowCount(hstm, &cnt);
   if (ret != SQL_SUCCESS)
   {
     stored_error_num = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT,
-      ((spider_db_odbc *) db_conn)->hstm, db_conn->conn, stored_error_msg);
+      hstm, db_conn->conn, stored_error_msg);
     DBUG_RETURN(0);
   }
   DBUG_RETURN((longlong) cnt);
@@ -1075,12 +1064,11 @@ void spider_db_odbc_result::move_to_pos(
   DBUG_ENTER("spider_db_odbc_result::move_to_pos");
   DBUG_PRINT("info",("spider this=%p", this));
   DBUG_PRINT("info",("spider pos=%lld", pos));
-  ret = SQLFetchScroll(((spider_db_odbc *) db_conn)->hstm, SQL_FETCH_FIRST,
-    (SQLLEN) pos);
+  ret = SQLFetchScroll(hstm, SQL_FETCH_FIRST, (SQLLEN) pos);
   if (ret != SQL_SUCCESS)
   {
     stored_error_num = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT,
-      ((spider_db_odbc *) db_conn)->hstm, db_conn->conn, stored_error_msg);
+      hstm, db_conn->conn, stored_error_msg);
   }
   DBUG_VOID_RETURN;
 }
@@ -1127,8 +1115,9 @@ int spider_db_odbc_result::fetch_table_for_discover_table_structure(
 #endif
 
 spider_db_odbc::spider_db_odbc(
-  SPIDER_CONN *conn
-) : spider_db_conn(conn), utility(&spider_db_odbc_utility),
+  SPIDER_CONN *conn,
+  spider_db_odbc_util *db_util
+) : spider_db_conn(conn), utility(db_util),
   henv(SQL_NULL_HENV), hdbc(SQL_NULL_HDBC), hstm(SQL_NULL_HSTMT),
   lock_table_hash_inited(FALSE), handler_open_array_inited(FALSE)
 {
@@ -1343,10 +1332,15 @@ int spider_db_odbc::connect(
 
   /* create connect string */
   use_driver = conn->tgt_default_group_length ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_driver:%s", use_driver ? "TRUE" : "FALSE"));
   use_dir = conn->tgt_default_file_length ? TRUE : FALSE;
-  use_dsn = conn->tgt_socket_length ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_dir:%s", use_dir ? "TRUE" : "FALSE"));
+  use_dsn = conn->tgt_dsn_length ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_dsn:%s", use_dsn ? "TRUE" : "FALSE"));
   use_db = conn->tgt_db_length ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_db:%s", use_db ? "TRUE" : "FALSE"));
   use_uid = conn->tgt_username_length ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_uid:%s", use_uid ? "TRUE" : "FALSE"));
   dummy_len = 0;
   conn_str_len =
     (use_driver ?
@@ -1362,7 +1356,7 @@ int spider_db_odbc::connect(
       0) +
     (use_dsn ?
       (SPIDER_DB_DSN_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
-        conn->tgt_socket_length + SPIDER_SQL_SEMICOLON_LEN) : 0) +
+        conn->tgt_dsn_length + SPIDER_SQL_SEMICOLON_LEN) : 0) +
     (use_db ?
       (SPIDER_SQL_DATABASE_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
         conn->tgt_db_length + SPIDER_SQL_COLON_LEN + conn->tgt_host_length +
@@ -1396,6 +1390,7 @@ int spider_db_odbc::connect(
 
   if (use_driver)
   {
+    DBUG_PRINT("info",("spider driver:%s", conn->tgt_default_group));
     memcpy(tmp_str, SPIDER_DB_DRIVER_STR, SPIDER_DB_DRIVER_LEN);
     tmp_str += SPIDER_DB_DRIVER_LEN;
     memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
@@ -1410,6 +1405,7 @@ int spider_db_odbc::connect(
     tmp_str += SPIDER_SQL_SEMICOLON_LEN;
     if (use_dir)
     {
+      DBUG_PRINT("info",("spider dir:%s", conn->tgt_default_file));
       memcpy(tmp_str, SPIDER_DB_DIRECTORY_STR, SPIDER_DB_DIRECTORY_LEN);
       tmp_str += SPIDER_DB_DIRECTORY_LEN;
       memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
@@ -1430,12 +1426,13 @@ int spider_db_odbc::connect(
 
   if (use_dsn)
   {
+    DBUG_PRINT("info",("spider dsn:%s", conn->tgt_dsn));
     memcpy(tmp_str, SPIDER_DB_DSN_STR, SPIDER_DB_DSN_LEN);
     tmp_str += SPIDER_DB_DSN_LEN;
     memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
     tmp_str += SPIDER_SQL_ODBC_EQUAL_LEN;
-    memcpy(tmp_str, conn->tgt_socket, conn->tgt_socket_length);
-    tmp_str += conn->tgt_socket_length;
+    memcpy(tmp_str, conn->tgt_dsn, conn->tgt_dsn_length);
+    tmp_str += conn->tgt_dsn_length;
     memcpy(tmp_str, SPIDER_SQL_SEMICOLON_STR, SPIDER_SQL_SEMICOLON_LEN);
     tmp_str += SPIDER_SQL_SEMICOLON_LEN;
   }
@@ -1449,6 +1446,7 @@ int spider_db_odbc::connect(
 
   if (use_db)
   {
+    DBUG_PRINT("info",("spider db:%s", conn->tgt_db));
     memcpy(tmp_str, SPIDER_SQL_DATABASE_STR, SPIDER_SQL_DATABASE_LEN);
     tmp_str += SPIDER_SQL_DATABASE_LEN;
     memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
@@ -1476,6 +1474,7 @@ int spider_db_odbc::connect(
 
   if (use_uid)
   {
+    DBUG_PRINT("info",("spider uid:%s", conn->tgt_username));
     memcpy(tmp_str, SPIDER_SQL_UID_STR, SPIDER_SQL_UID_LEN);
     tmp_str += SPIDER_SQL_UID_LEN;
     memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
@@ -1565,8 +1564,20 @@ void spider_db_odbc::bg_disconnect()
 
 void spider_db_odbc::disconnect()
 {
+  SQLRETURN ret;
   DBUG_ENTER("spider_db_odbc::disconnect");
   DBUG_PRINT("info",("spider this=%p", this));
+  if (hstm != SQL_NULL_HSTMT)
+  {
+    ret = SQLFreeStmt(hstm, SQL_CLOSE);
+    if (ret != SQL_SUCCESS)
+    {
+      stored_error = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT,
+        hstm, conn, stored_error_msg);
+    }
+    SQLFreeHandle(SQL_HANDLE_STMT, hstm);
+    hstm = SQL_NULL_HSTMT;
+  }
   if (hdbc != SQL_NULL_HDBC)
   {
     SQLDisconnect(hdbc);
@@ -1626,21 +1637,24 @@ int spider_db_odbc::exec_query(
   }
   if (!spider_param_dry_access())
   {
-    ret = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstm);
-    if (ret != SQL_SUCCESS)
+    if (hstm == SQL_NULL_HSTMT)
     {
-      stored_error = spider_db_odbc_get_error(ret, SQL_HANDLE_DBC, hdbc,
-        conn, stored_error_msg);
-      DBUG_RETURN(stored_error);
-    }
-    ret = SQLSetCursorName(hstm, (SQLCHAR *) "cur", SQL_NTS);
-    if (ret != SQL_SUCCESS)
-    {
-      stored_error = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT, hstm,
-        conn, stored_error_msg);
-      SQLFreeHandle(SQL_HANDLE_STMT, hstm);
-      hstm = NULL;
-      DBUG_RETURN(stored_error);
+      ret = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstm);
+      if (ret != SQL_SUCCESS)
+      {
+        stored_error = spider_db_odbc_get_error(ret, SQL_HANDLE_DBC, hdbc,
+          conn, stored_error_msg);
+        DBUG_RETURN(stored_error);
+      }
+      ret = SQLSetCursorName(hstm, (SQLCHAR *) "cur", SQL_NTS);
+      if (ret != SQL_SUCCESS)
+      {
+        stored_error = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT, hstm,
+          conn, stored_error_msg);
+        SQLFreeHandle(SQL_HANDLE_STMT, hstm);
+        hstm = NULL;
+        DBUG_RETURN(stored_error);
+      }
     }
     ret = SQLExecDirect(hstm, (SQLCHAR *) query, (SQLINTEGER) length);
     if (ret != SQL_SUCCESS && ret != SQL_NO_DATA)
@@ -1737,6 +1751,7 @@ spider_db_result *spider_db_odbc::store_result(
   DBUG_ASSERT(!spider_res_buf);
   if ((result = new spider_db_odbc_result(this)))
   {
+    hstm = SQL_NULL_HSTMT;
     *err = 0;
     if (spider_param_dry_access() ||
       (*err = result->init()))
@@ -1761,6 +1776,7 @@ spider_db_result *spider_db_odbc::use_result(
   DBUG_PRINT("info",("spider this=%p", this));
   if ((result = new spider_db_odbc_result(this)))
   {
+    hstm = SQL_NULL_HSTMT;
     *err = 0;
     if (spider_param_dry_access() ||
       (*err = result->init()))
@@ -2545,9 +2561,15 @@ bool spider_db_odbc::cmp_request_key_to_snd(
   DBUG_RETURN(TRUE);
 }
 
-spider_db_odbc_util::spider_db_odbc_util() : spider_db_util(),
-  name_quote("\""), value_quote("'"), name_quote_length(1),
-  value_quote_length(1)
+spider_db_odbc_util::spider_db_odbc_util(
+  const char *nm_quote,
+  const char *val_quote,
+  uint nm_quote_length,
+  uint val_quote_length
+) : spider_db_util(),
+  name_quote(nm_quote), value_quote(val_quote),
+  name_quote_length(nm_quote_length),
+  value_quote_length(val_quote_length)
 {
   DBUG_ENTER("spider_db_odbc_util::spider_db_odbc_util");
   DBUG_PRINT("info",("spider this=%p", this));
@@ -5313,12 +5335,13 @@ uint spider_db_odbc_util::limit_mode()
 }
 
 spider_odbc_share::spider_odbc_share(
-  st_spider_share *share
+  st_spider_share *share,
+  spider_db_odbc_util *db_util
 ) : spider_db_share(
   share,
-  spider_db_odbc_utility.dbton_id
+  db_util->dbton_id
 ),
-  utility(&spider_db_odbc_utility),
+  utility(db_util),
   table_select(NULL),
   table_select_pos(0),
   key_select(NULL),
@@ -5910,12 +5933,13 @@ int spider_odbc_share::discover_table_structure(
 
 spider_odbc_handler::spider_odbc_handler(
   ha_spider *spider,
-  spider_odbc_share *db_share
+  spider_odbc_share *db_share,
+  spider_db_odbc_util *db_util
 ) : spider_db_handler(
   spider,
   db_share
 ),
-  utility(&spider_db_odbc_utility),
+  utility(db_util),
   where_pos(0),
   order_pos(0),
   limit_pos(0),
@@ -11452,6 +11476,7 @@ int spider_odbc_handler::get_statistics(
   SQLBindCol(hstm, 13, SQL_C_CHAR, filter_condition, SPIDER_IDENT_SPACE,
     &filter_condition_sz);
   ret = SQLFetch(hstm);
+  TABLE *table = spider->get_table();
   Field *field;
   memset((uchar *) share->cardinality_upd, 0,
     sizeof(uchar) * share->bitmap_size);
@@ -11476,7 +11501,7 @@ int spider_odbc_handler::get_statistics(
       share->stat.auto_increment_value = 1;
     } else {
       if (cardinality_sz > 0 &&
-        (field = find_field_in_table_sef(field->table,
+        (field = find_field_in_table_sef(table,
           (const char *) column_name)))
       {
         if ((share->cardinality[field->field_index] =
@@ -12345,11 +12370,12 @@ int spider_odbc_handler::append_order_by(
 #endif
 
 spider_odbc_copy_table::spider_odbc_copy_table(
-  spider_odbc_share *db_share
+  spider_odbc_share *db_share,
+  spider_db_odbc_util *db_util
 ) : spider_db_copy_table(
   db_share
 ),
-  utility(&spider_db_odbc_utility),
+  utility(db_util),
   odbc_share(db_share)
 {
   DBUG_ENTER("spider_odbc_copy_table::spider_odbc_copy_table");
