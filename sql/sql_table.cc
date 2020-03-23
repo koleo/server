@@ -10001,6 +10001,10 @@ bool mysql_alter_table(THD *thd, const LEX_CSTRING *new_db,
     has been already processed.
   */
   table_list->required_type= TABLE_TYPE_NORMAL;
+  if (online)
+  {
+    table_list->lock_type= TL_READ;
+  }
 
   DEBUG_SYNC(thd, "alter_table_before_open_tables");
 
@@ -10756,7 +10760,8 @@ do_continue:;
   if (!table->s->tmp_table)
   {
     // COPY algorithm doesn't work with concurrent writes.
-    if (alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_NONE)
+    if (!online &&
+        alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_NONE)
     {
       my_error(ER_ALTER_OPERATION_NOT_SUPPORTED_REASON, MYF(0),
                "LOCK=NONE",
@@ -10772,13 +10777,10 @@ do_continue:;
 
     /*
       Otherwise upgrade to SHARED_NO_WRITE.
-      In case if ONLINE possible, upgrade to SHARED_READ instead.
       Note that under LOCK TABLES, we will already have SHARED_NO_READ_WRITE.
     */
     if (alter_info->requested_lock != Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE &&
-        thd->mdl_context.upgrade_shared_lock(mdl_ticket,
-                                             online ? MDL_SHARED_READ
-                                                    : MDL_SHARED_NO_WRITE,
+        thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_SHARED_NO_WRITE,
                                              thd->variables.lock_wait_timeout))
       goto err_new_table_cleanup;
 
@@ -11330,10 +11332,10 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 
   if (online)
   {
-    MDL_ticket *mdl_ticket= from->mdl_ticket;
-    if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_EXCLUSIVE,
-                                             thd->variables.lock_wait_timeout))
-      DBUG_RETURN(1);
+    // MDL_ticket *mdl_ticket= from->mdl_ticket;
+    // if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_EXCLUSIVE,
+    //                                          thd->variables.lock_wait_timeout))
+    //   DBUG_RETURN(1);
 
     uint online_alter_sync_period= 0;
     from->s->online_ater_binlog= new (alloc_root(&from->s->mem_root,
@@ -11362,10 +11364,12 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     if (error)
       DBUG_RETURN(1);
 
-    if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_SHARED_READ,
-                                             thd->variables.lock_wait_timeout,
-                                             true))
-      DBUG_RETURN(1);
+    from->mdl_ticket->downgrade_lock(MDL_SHARED_UPGRADABLE);
+
+    // if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_SHARED_READ,
+    //                                          thd->variables.lock_wait_timeout,
+    //                                          true))
+    //   DBUG_RETURN(1);
   }
 
   if (!(copy= new (thd->mem_root) Copy_field[to->s->fields]))
@@ -11657,7 +11661,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 
   DEBUG_SYNC(thd, "alter_table_copy_end");
 
-  if (online && error == 0)
+  if (online && error < 0)
   {
     Relay_log_info rli(false);
     rpl_group_info rgi(&rli);
@@ -11678,13 +11682,23 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     File file= open_binlog(&log, linfo.log_file_name, &errmsg);
     DBUG_ASSERT(file); // TODO handle
 
-    Format_description_log_event description_event(4);
+    rli.relay_log.description_event_for_exec=
+                                            new Format_description_log_event(4);
 
     mysql_mutex_lock(binlog->get_log_lock()); // TODO decrease window
 
-    while (auto *ev= Log_event::read_log_event(&log, &description_event, false))
+    while (auto *ev= Log_event::read_log_event(&log,
+                               rli.relay_log.description_event_for_exec, false))
     {
+      ev->thd= thd;
+      MEM_ROOT event_mem_root;
+      Query_arena backup_arena;
+      Query_arena event_arena(&event_mem_root, Query_arena::STMT_INITIALIZED);
+      init_sql_alloc(&event_mem_root, "event_memroot",
+                     MEM_ROOT_BLOCK_SIZE, 0, MYF(0));
+      thd->set_n_backup_active_arena(&event_arena, &backup_arena);
       ev->apply_event(&rgi);
+      thd->restore_active_arena(&event_arena, &backup_arena);
     }
 
     mysql_mutex_unlock(binlog->get_log_lock());

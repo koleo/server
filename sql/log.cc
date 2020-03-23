@@ -2166,7 +2166,10 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
     if (unlikely(error))
       DBUG_RETURN(error);
 
+    mysql_mutex_lock(binlog->get_log_lock());
     error= binlog->write_cache(thd, &table->online_alter_cache->cache_log);
+    mysql_mutex_unlock(binlog->get_log_lock());
+
     if (error)
     {
       my_error(ER_ERROR_ON_WRITE, MYF(ME_ERROR_LOG), binlog->get_name(), errno);
@@ -6205,7 +6208,7 @@ MYSQL_BIN_LOG::flush_and_set_pending_rows_event(THD *thd,
                                                 bool is_transactional)
 {
   DBUG_ENTER("MYSQL_BIN_LOG::flush_and_set_pending_rows_event(event)");
-  DBUG_ASSERT(WSREP_EMULATE_BINLOG(thd) || mysql_bin_log.is_open());
+  DBUG_ASSERT(WSREP_EMULATE_BINLOG(thd) || is_open());
   DBUG_PRINT("enter", ("event: %p", event));
 
   DBUG_PRINT("info", ("cache_mngr->pending(): %p", cache_data->pending()));

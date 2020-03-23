@@ -6713,10 +6713,10 @@ int handler::binlog_log_row(TABLE *table,
   DBUG_ENTER("handler::binlog_log_row");
 
 
-  if (!table->file->check_table_binlog_row_based())
-    DBUG_RETURN(0);
-  int error= binlog_log_row_to_binlog(table, before_record, after_record,
-                                      log_func, row_logging_has_trans);
+  int error = 0;
+  if (table->file->check_table_binlog_row_based())
+    error= binlog_log_row_to_binlog(table, before_record, after_record,
+                                    log_func);
   if (!error)
     error= binlog_log_row_online_alter(table, before_record, after_record,
                                        log_func, row_logging_has_trans);
