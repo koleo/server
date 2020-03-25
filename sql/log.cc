@@ -2160,7 +2160,13 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
     auto *binlog= table->s->online_ater_binlog;
     DBUG_ASSERT(binlog);
     
-    error= binlog_flush_pending_rows_event(thd, true, true,
+    error= binlog_flush_pending_rows_event(thd,
+                                           /*
+                                             do not set STMT_END for last event
+                                             to leave table open in altering thd
+                                           */
+                                           false,
+                                           true,
                                            binlog,
                                            table->online_alter_cache);
     if (unlikely(error))
@@ -2168,6 +2174,8 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
 
     mysql_mutex_lock(binlog->get_log_lock());
     error= binlog->write_cache(thd, &table->online_alter_cache->cache_log);
+    if (!error)
+      error= binlog->flush_and_sync(NULL);
     mysql_mutex_unlock(binlog->get_log_lock());
 
     if (error)
@@ -2176,7 +2184,7 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
       DBUG_RETURN(error);
     }
   }
-  
+
   binlog_cache_mngr *const cache_mngr= thd->binlog_get_cache_mngr();
 
   if (!cache_mngr)

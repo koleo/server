@@ -11663,9 +11663,13 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 
   if (online && error < 0)
   {
+    Table_map_log_event table_event(thd, from, from->s->table_map_id,
+                                    from->file->has_transactions());
     Relay_log_info rli(false);
     rpl_group_info rgi(&rli);
-    RPL_TABLE_LIST rpl_table(to, TL_WRITE, from, copy, copy_end);
+    RPL_TABLE_LIST rpl_table(to, TL_WRITE, from, table_event.get_table_def(),
+                             copy, copy_end);
+    rgi.thd= thd;
     rgi.tables_to_lock= &rpl_table;
 
     rgi.m_table_map.set_table(from->s->table_map_id, to);
@@ -11685,17 +11689,18 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     rli.relay_log.description_event_for_exec=
                                             new Format_description_log_event(4);
 
+    MEM_ROOT event_mem_root;
+    Query_arena backup_arena;
+    Query_arena event_arena(&event_mem_root, Query_arena::STMT_INITIALIZED);
+    init_sql_alloc(&event_mem_root, "event_memroot",
+                   MEM_ROOT_BLOCK_SIZE, 0, MYF(0));
+
     mysql_mutex_lock(binlog->get_log_lock()); // TODO decrease window
 
     while (auto *ev= Log_event::read_log_event(&log,
                                rli.relay_log.description_event_for_exec, false))
     {
       ev->thd= thd;
-      MEM_ROOT event_mem_root;
-      Query_arena backup_arena;
-      Query_arena event_arena(&event_mem_root, Query_arena::STMT_INITIALIZED);
-      init_sql_alloc(&event_mem_root, "event_memroot",
-                     MEM_ROOT_BLOCK_SIZE, 0, MYF(0));
       thd->set_n_backup_active_arena(&event_arena, &backup_arena);
       ev->apply_event(&rgi);
       thd->restore_active_arena(&event_arena, &backup_arena);

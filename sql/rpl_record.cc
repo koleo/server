@@ -245,7 +245,9 @@ unpack_row(rpl_group_info *rgi,
   if (rgi && !table_found)
     DBUG_RETURN(HA_ERR_GENERIC);
 
-  for (field_ptr= begin_ptr ; field_ptr < end_ptr && *field_ptr ; ++field_ptr)
+  for (field_ptr= begin_ptr;
+       tabledef && field_ptr < end_ptr && *field_ptr;
+       ++field_ptr)
   {
     /*
       If there is a conversion table, we pick up the field pointer to

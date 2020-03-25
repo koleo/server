@@ -6359,6 +6359,13 @@ check_table_map(rpl_group_info *rgi, RPL_TABLE_LIST *table_list)
   DBUG_RETURN(res);
 }
 
+table_def Table_map_log_event::get_table_def()
+{
+  return table_def(m_coltype, m_colcnt,
+                   m_field_metadata, m_field_metadata_size,
+                   m_null_bits, m_flags);
+}
+
 int Table_map_log_event::do_apply_event(rpl_group_info *rgi)
 {
   RPL_TABLE_LIST *table_list;
@@ -6404,9 +6411,7 @@ int Table_map_log_event::do_apply_event(rpl_group_info *rgi)
     table_def destructor explicitly.
   */
   new(table_list) RPL_TABLE_LIST(&tmp_db_name, &tmp_tbl_name, TL_WRITE,
-                                 table_def(m_coltype, m_colcnt,
-                                           m_field_metadata, m_field_metadata_size,
-                                           m_null_bits, m_flags),
+                                 get_table_def(),
                                  m_flags & TM_BIT_HAS_TRIGGERS_F);
 
   table_list->table_id= DBUG_EVALUATE_IF("inject_tblmap_same_id_maps_diff_table",
