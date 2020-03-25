@@ -3960,6 +3960,8 @@ private:
   bool  m_used_query_txt;
 };
 
+class table_def;
+
 /**
   @class Table_map_log_event
 
@@ -4611,6 +4613,7 @@ public:
   virtual bool print(FILE *file, PRINT_EVENT_INFO *print_event_info);
 #endif
 
+  table_def get_table_def();
 
 private:
 #if defined(MYSQL_SERVER) && defined(HAVE_REPLICATION)

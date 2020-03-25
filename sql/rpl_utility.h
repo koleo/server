@@ -257,10 +257,12 @@ struct RPL_TABLE_LIST
   {}
 
   RPL_TABLE_LIST(TABLE *table, thr_lock_type lock_type, TABLE *conv_table,
+                 table_def tabledef,
                  const Copy_field online_alter_copy_fields[],
                  const Copy_field *online_alter_copy_fields_end)
     :  TABLE_LIST(table, lock_type),
-       m_tabledef_valid(false), m_tabledef(NULL, 0, NULL, 0, NULL, 0),
+       m_tabledef_valid(true),
+       m_tabledef(tabledef),
        m_conv_table(conv_table), master_had_triggers(false),
        m_online_alter_copy_fields(online_alter_copy_fields),
        m_online_alter_copy_fields_end(online_alter_copy_fields_end)
