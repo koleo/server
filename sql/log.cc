@@ -4165,7 +4165,8 @@ int MYSQL_BIN_LOG::find_log_pos(LOG_INFO *linfo, const char *log_name,
                        log_name ? log_name : "NULL", full_log_name));
 
   /* As the file is flushed, we can't get an error here */
-  (void) reinit_io_cache(&index_file, READ_CACHE, (my_off_t) 0, 0, 0);
+  error= reinit_io_cache(&index_file, READ_CACHE, (my_off_t) 0, 0, 0);
+  DBUG_ASSERT(!error);
 
   for (;;)
   {

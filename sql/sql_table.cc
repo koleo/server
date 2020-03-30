@@ -11297,6 +11297,36 @@ public:
   }
 };
 
+static int online_alter_read_from_binlog(THD *thd, rpl_group_info *rgi,
+                                         MYSQL_BIN_LOG *binlog, IO_CACHE *log)
+{
+  MEM_ROOT event_mem_root;
+  Query_arena backup_arena;
+  Query_arena event_arena(&event_mem_root, Query_arena::STMT_INITIALIZED);
+  init_sql_alloc(&event_mem_root, "event_memroot",
+                 MEM_ROOT_BLOCK_SIZE, 0, MYF(0));
+
+  int error= 0;
+
+  do
+  {
+    mysql_mutex_lock(binlog->get_log_lock());
+    const auto *descr_event= rgi->rli->relay_log.description_event_for_exec;
+    auto *ev= Log_event::read_log_event(log, descr_event, false);
+    mysql_mutex_unlock(binlog->get_log_lock());
+    if (!ev)
+      break;
+
+    ev->thd= thd;
+    thd->set_n_backup_active_arena(&event_arena, &backup_arena);
+    error= ev->apply_event(rgi);
+    thd->restore_active_arena(&event_arena, &backup_arena);
+  }
+  while(!error);
+
+  return error;
+}
+
 static int
 copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 			 List<Create_field> &create, bool ignore,
@@ -11330,6 +11360,7 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   /* Two or 3 stages; Sorting, copying data and update indexes */
   thd_progress_init(thd, 2 + MY_TEST(order));
 
+  uint online_alter_sync_period= 0;
   if (online)
   {
     // MDL_ticket *mdl_ticket= from->mdl_ticket;
@@ -11337,23 +11368,23 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     //                                          thd->variables.lock_wait_timeout))
     //   DBUG_RETURN(1);
 
-    uint online_alter_sync_period= 0;
-    from->s->online_ater_binlog= new (alloc_root(&from->s->mem_root,
+    from->s->online_ater_binlog= new (alloc_root(thd->mem_root,
                                                  sizeof (MYSQL_BIN_LOG)))
                                  MYSQL_BIN_LOG(&online_alter_sync_period);
     if (!from->s->online_ater_binlog)
       DBUG_RETURN(1);
     //TODO cleanup
 
+    from->s->online_ater_binlog->is_relay_log= true;
     from->s->online_ater_binlog->init_pthread_objects();
 
     char log_name[FN_REFLEN];
 
     // path to frm without extension
     memcpy(log_name, from->s->normalized_path.str,
-           from->s->normalized_path.length - 4);
-    strncpy(log_name + from->s->normalized_path.length - 4,
-            STRING_WITH_LEN("-online-binglog"));
+           from->s->normalized_path.length);
+    strncpy(log_name + from->s->normalized_path.length, "-online-binglog",
+            FN_REFLEN - from->s->normalized_path.length);
 
     mysql_mutex_lock(from->s->online_ater_binlog->get_log_lock());
     error= from->s->online_ater_binlog->open_index_file(NULL, log_name, TRUE) ||
@@ -11661,6 +11692,19 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 
   DEBUG_SYNC(thd, "alter_table_copy_end");
 
+  if (error > 0 && !from->s->tmp_table)
+  {
+    /* We are going to drop the temporary table */
+    to->file->extra(HA_EXTRA_PREPARE_FOR_DROP);
+  }
+  if (unlikely(to->file->ha_end_bulk_insert()) && error <= 0)
+  {
+    /* Give error, if not already given */
+    if (!thd->is_error())
+      to->file->print_error(my_errno,MYF(0));
+    error= 1;
+  }
+
   if (online && error < 0)
   {
     Table_map_log_event table_event(thd, from, from->s->table_map_id,
@@ -11674,11 +11718,10 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
 
     rgi.m_table_map.set_table(from->s->table_map_id, to);
 
-    auto *binlog= from->s->online_ater_binlog;
-    DBUG_ASSERT(binlog->is_open());
+    DBUG_ASSERT(from->s->online_ater_binlog->is_open());
 
     LOG_INFO linfo;
-    error= binlog->find_log_pos(&linfo, NULL, 1);
+    error= from->s->online_ater_binlog->find_log_pos(&linfo, NULL, 1);
     DBUG_ASSERT(error == 0); // TODO handle error
 
     IO_CACHE log;
@@ -11689,44 +11732,23 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     rli.relay_log.description_event_for_exec=
                                             new Format_description_log_event(4);
 
-    MEM_ROOT event_mem_root;
-    Query_arena backup_arena;
-    Query_arena event_arena(&event_mem_root, Query_arena::STMT_INITIALIZED);
-    init_sql_alloc(&event_mem_root, "event_memroot",
-                   MEM_ROOT_BLOCK_SIZE, 0, MYF(0));
 
-    mysql_mutex_lock(binlog->get_log_lock()); // TODO decrease window
+    online_alter_read_from_binlog(thd, &rgi, from->s->online_ater_binlog, &log);
 
-    while (auto *ev= Log_event::read_log_event(&log,
-                               rli.relay_log.description_event_for_exec, false))
-    {
-      ev->thd= thd;
-      thd->set_n_backup_active_arena(&event_arena, &backup_arena);
-      ev->apply_event(&rgi);
-      thd->restore_active_arena(&event_arena, &backup_arena);
-    }
 
-    mysql_mutex_unlock(binlog->get_log_lock());
+    thd->mdl_context.upgrade_shared_lock(from->mdl_ticket, MDL_EXCLUSIVE,
+                                         thd->variables.lock_wait_timeout);
 
+    from->s->online_ater_binlog->reset_logs(thd, false, NULL, 0, 0);
+    from->s->online_ater_binlog->cleanup();
+    from->s->online_ater_binlog->~MYSQL_BIN_LOG();
+    from->s->online_ater_binlog= NULL;
   }
-  // TODO read binlog
 
   // TODO handle m_vers_from_plain
   THD_STAGE_INFO(thd, stage_enabling_keys);
   thd_progress_next_stage(thd);
 
-  if (error > 0 && !from->s->tmp_table)
-  {
-    /* We are going to drop the temporary table */
-    to->file->extra(HA_EXTRA_PREPARE_FOR_DROP);
-  }
-  if (unlikely(to->file->ha_end_bulk_insert()) && error <= 0)
-  {
-    /* Give error, if not already given */
-    if (!thd->is_error())
-      to->file->print_error(my_errno,MYF(0));
-    error= 1;
-  }
   if (!ignore)
     to->file->extra(HA_EXTRA_END_ALTER_COPY);
 

@@ -6665,6 +6665,9 @@ static int binlog_log_row_online_alter(TABLE* table,
   if (!table->online_alter_cache)
     table->online_alter_cache= thd->binlog_setup_cache_data(&table->mem_root);
 
+  // We need to log all columns for the caase if alter table chanes primary key
+  table->use_all_columns();
+
   int error= (*log_func)(thd, table, table->s->online_ater_binlog,
                          table->online_alter_cache, has_trans,
                          before_record, after_record);
