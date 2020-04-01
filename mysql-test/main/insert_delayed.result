@@ -1,0 +1,2 @@
+INSERT DELAYED t1 () VALUES ();
+ERROR 42S02: Table 'test.t1' doesn't exist

@@ -1,0 +1,5 @@
+#
+# MENT-668 : ASAN heap-use-after-free in strnlen / vprint_msg_to_blackbox	
+#
+--error ER_NO_SUCH_TABLE
+INSERT DELAYED t1 () VALUES ();
