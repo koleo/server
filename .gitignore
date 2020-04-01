@@ -29,6 +29,8 @@ TAGS
 Testing/
 tmp/
 VERSION.dep
+blackbox/src/bbtool
+blackbox/tests/unittest
 configure
 client/async_example
 client/mysql
@@ -86,6 +88,7 @@ libmysqld/examples/mysqltest_embedded
 make_dist.cmake
 mariadb-*.*.*.tar.gz
 mariadb-*.*.*/
+mysql-test/include/max_indexes.inc
 mysql-test/lib/My/SafeProcess/my_safe_process
 mysql-test/lib/My/SafeProcess/wsrep_check_version
 mysql-test/mtr
