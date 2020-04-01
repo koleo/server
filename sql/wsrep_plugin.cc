@@ -58,7 +58,7 @@ struct st_mysql_storage_engine wsrep_plugin= {
 
 maria_declare_plugin(wsrep)
 {
-  MYSQL_STORAGE_ENGINE_PLUGIN,
+  MariaDB_FUNCTION_PLUGIN,
   &wsrep_plugin,
   "wsrep",
   "Codership Oy",
