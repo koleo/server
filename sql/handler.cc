@@ -8395,3 +8395,23 @@ Table_scope_and_contents_source_st::fix_period_fields(THD *thd,
   }
   return false;
 }
+
+#ifdef WITH_WSREP
+bool wsrep_check_initialization_order()
+{
+  handlerton *hton= installed_htons[DB_TYPE_INNODB];
+  if (hton)
+  {
+    st_plugin_int *plugin= hton2plugin[hton->slot];
+    if (plugin)
+    {
+      if (plugin->state == PLUGIN_IS_READY)
+      {
+        return true; // InnoDB plugin is initialized
+      }
+    }
+  }
+
+  return false; // InnoDB plugin is not initialized
+}
+#endif /* WITH_WSREP */

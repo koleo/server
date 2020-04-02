@@ -18,20 +18,34 @@
 
 #include <mysql/plugin.h>
 
+extern bool wsrep_check_initialization_order(); // handler.cc
+
 static int wsrep_plugin_init(void *p)
 {
   WSREP_DEBUG("wsrep_plugin_init()");
   int ret= 0;
+
   wsrep_enable_encryption();
+
+  // wsrep_plugin must be initialized before InnoDB plugin,
+  // lets check it.
+  if (wsrep_check_initialization_order())
+  {
+    WSREP_ERROR("InnoDB plugin is initialized before wsrep plugin."
+                " This configuration is unsupported as wsrep plugin "
+                " needs to be initialized before InnoDB plugin");
+    unireg_abort(1);
+  }
+
   if (wsrep_startup_state == WSREP_STARTUP_STATE_INIT_BEFORE_SE)
-  { 
+  {
     if (wsrep_init_startup(true))
       return wsrep_startup_state == WSREP_STARTUP_STATE_MUST_ABORT;
-    
-    /* After SST has completed we could receive binlog files so reopening 
+
+    /* After SST has completed we could receive binlog files so reopening
        binlog index */
     if (opt_bin_log)
-    { 
+    {
       mysql_mutex_lock(mysql_bin_log.get_log_lock());
       mysql_bin_log.close(LOG_CLOSE_INDEX | LOG_CLOSE_TO_BE_OPENED);
       if (mysql_bin_log.open_index_file(opt_binlog_index_name,
