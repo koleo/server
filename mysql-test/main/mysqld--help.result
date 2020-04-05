@@ -1154,6 +1154,9 @@ The following specify which files/extra groups are read (specified before remain
  --show-slave-auth-info 
  Show user and password in SHOW SLAVE HOSTS on this
  master.
+ --shutdown-wait-for-slaves 
+ when ON, SHUTDOWN command runs with implicit WAIT FOR ALL
+ SLAVES option.
  --silent-startup    Don't print [Note] to the error log during startup.
  --skip-grant-tables Start without grant tables. This gives all users FULL
  ACCESS to all tables.
@@ -1756,6 +1759,7 @@ session-track-state-change FALSE
 session-track-system-variables autocommit,character_set_client,character_set_connection,character_set_results,time_zone
 session-track-transaction-info OFF
 show-slave-auth-info FALSE
+shutdown-wait-for-slaves FALSE
 silent-startup FALSE
 skip-grant-tables TRUE
 skip-name-resolve FALSE

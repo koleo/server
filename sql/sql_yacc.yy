@@ -14327,7 +14327,11 @@ shutdown:
         ;
 
 shutdown_option:
-        /*  Empty */    { Lex->is_shutdown_wait_for_slaves= false; }
+        /*  Empty */
+        {
+          Lex->is_shutdown_wait_for_slaves=
+            opt_shutdown_wait_for_slaves;
+        }
         | WAIT_SYM FOR_SYM ALL SLAVES
         {
           Lex->is_shutdown_wait_for_slaves= true;

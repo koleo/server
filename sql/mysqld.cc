@@ -449,6 +449,7 @@ uint lower_case_table_names;
 ulong tc_heuristic_recover= 0;
 Atomic_counter<uint32_t> thread_count;
 bool shutdown_wait_for_slaves;
+my_bool opt_shutdown_wait_for_slaves;
 Atomic_counter<uint32_t> slave_open_temp_tables;
 ulong thread_created;
 ulong back_log, connect_timeout, server_id;

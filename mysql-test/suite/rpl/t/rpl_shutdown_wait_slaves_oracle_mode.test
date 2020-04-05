@@ -1,6 +1,8 @@
 #
 # MENT-699 sql_mode oracle grammar misses out shutdown's WAIT_SYM FOR_SYM ALL SLAVES
 # The test of MENT-64 runs SHUTDOWN in specific 'oracle' sql_mode.
+# MENT-202 Implement system variable that makes slow master shutdown the default behavior
+# The test checks the non-default value of introduced @@global.shutdown_wait_slaves.
 #
 --source include/have_innodb.inc
 --source include/have_debug.inc
@@ -9,6 +11,9 @@
 
 --connection server_1
 --let $sql_mode_cmd=SET @@sql_mode='oracle'
+--let $sav_var=`SELECT @@global.shutdown_wait_for_slaves`
+SET @@global.shutdown_wait_for_slaves = 1;
 --source include/rpl_shutdown_wait_slaves.inc
+--eval SET @@global.shutdown_wait_for_slaves = $sav_var
 --source include/rpl_end.inc
 

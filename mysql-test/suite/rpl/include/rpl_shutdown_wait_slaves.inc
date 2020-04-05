@@ -41,11 +41,16 @@ SET @@GLOBAL.debug_dbug="+d,simulate_delay_at_shutdown";
 wait
 EOF
 
+if (`SELECT @@global.shutdown_wait_for_slaves = 0`)
+{
+ --let $shutdown_opt=WAIT FOR ALL SLAVES
+}
 if ($sql_mode_cmd)
 {
  --eval $sql_mode_cmd
 }
---send SHUTDOWN WAIT FOR ALL SLAVES
+--send_eval SHUTDOWN $shutdown_opt
+
 --reap
 --source include/wait_until_disconnected.inc
 #
