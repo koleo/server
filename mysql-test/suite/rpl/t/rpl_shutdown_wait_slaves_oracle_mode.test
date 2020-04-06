@@ -1,0 +1,14 @@
+#
+# MENT-699 sql_mode oracle grammar misses out shutdown's WAIT_SYM FOR_SYM ALL SLAVES
+# The test of MENT-64 runs SHUTDOWN in specific 'oracle' sql_mode.
+#
+--source include/have_innodb.inc
+--source include/have_debug.inc
+--let $rpl_topology=1->2, 1->3, 1->4
+--source include/rpl_init.inc
+
+--connection server_1
+--let $sql_mode_cmd=SET @@sql_mode='oracle'
+--source include/rpl_shutdown_wait_slaves.inc
+--source include/rpl_end.inc
+

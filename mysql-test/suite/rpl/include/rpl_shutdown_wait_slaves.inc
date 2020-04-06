@@ -40,7 +40,11 @@ SET @@GLOBAL.debug_dbug="+d,simulate_delay_at_shutdown";
 --write_file $MYSQLTEST_VARDIR/tmp/mysqld.1.expect
 wait
 EOF
-# --shutdown_server
+
+if ($sql_mode_cmd)
+{
+ --eval $sql_mode_cmd
+}
 --send SHUTDOWN WAIT FOR ALL SLAVES
 --reap
 --source include/wait_until_disconnected.inc
