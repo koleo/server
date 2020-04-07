@@ -132,6 +132,7 @@ our $opt_vardir;                # Path to use for var/ dir
 our $plugindir;
 our $opt_xml_report;            # XML output
 our $client_plugindir;
+
 my $path_vardir_trace;          # unix formatted opt_vardir for trace files
 my $opt_tmpdir;                 # Path to use for tmp/ dir
 my $opt_tmpdir_pid;
@@ -453,7 +454,9 @@ sub main {
   if ($opt_gcov) {
     system './dgcov.pl --purge';
   }
-  
+
+
+
   #######################################################################
   my $num_tests= $mtr_report::tests_total= @$tests;
   if ( $opt_parallel eq "auto" ) {
@@ -6580,6 +6583,7 @@ Misc options
   xml-report=<file>     Output jUnit xml file of the results.
   tail-lines=N          Number of lines of the result to include in a failure
                         report.
+  xml-report=<file>     Output jUnit xml file of the results.
 
 Some options that control enabling a feature for normal test runs,
 can be turned off by prepending 'no' to the option, e.g. --notimer.
