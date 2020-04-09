@@ -37,7 +37,7 @@ wsrep_on=1
 wsrep_provider=none
 
 # Provider specific configuration options
-#wsrep_provider_options=
+wsrep_provider_options="gcache.size=1024Mb"
 
 # Logical cluster name. Should be the same for all nodes.
 wsrep_cluster_name="my_wsrep_cluster"
