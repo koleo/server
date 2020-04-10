@@ -606,7 +606,6 @@ spider_db_result *spider_db_odbc_mariadb::store_result(
   spider_db_odbc_mariadb_result *result;
   DBUG_ENTER("spider_db_odbc_mariadb::store_result");
   DBUG_PRINT("info",("spider this=%p", this));
-  DBUG_ASSERT(!spider_res_buf);
   if ((result = new spider_db_odbc_mariadb_result(this)))
   {
     hstm = SQL_NULL_HSTMT;
@@ -618,6 +617,7 @@ spider_db_result *spider_db_odbc_mariadb::store_result(
     {
       delete result;
       result = NULL;
+      DBUG_RETURN(NULL);
     }
     result->set_limit(limit);
     result->spider = (ha_spider *) request_key->handler;
@@ -628,6 +628,7 @@ spider_db_result *spider_db_odbc_mariadb::store_result(
 }
 
 spider_db_result *spider_db_odbc_mariadb::use_result(
+  ha_spider *spider,
   st_spider_db_request_key *request_key,
   int *err
 ) {
@@ -648,7 +649,7 @@ spider_db_result *spider_db_odbc_mariadb::use_result(
       DBUG_RETURN(NULL);
     }
     result->set_limit(limit);
-    result->spider = (ha_spider *) request_key->handler;
+    result->spider = spider;
   } else {
     *err = HA_ERR_OUT_OF_MEM;
   }

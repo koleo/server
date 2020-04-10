@@ -1160,7 +1160,7 @@ int spider_db_odbc::init()
   DBUG_ENTER("spider_db_odbc::init");
   DBUG_PRINT("info",("spider this=%p", this));
   if (
-    my_hash_init(&lock_table_hash, spd_charset_utf8mb3_bin, 32, 0, 0,
+    my_hash_init(PSI_INSTRUMENT_ME, &lock_table_hash, spd_charset_utf8mb3_bin, 32, 0, 0,
       (my_hash_get_key) spider_link_get_key, 0, 0)
   ) {
     DBUG_RETURN(HA_ERR_OUT_OF_MEM);
@@ -1768,6 +1768,7 @@ spider_db_result *spider_db_odbc::store_result(
 }
 
 spider_db_result *spider_db_odbc::use_result(
+  ha_spider *spider,
   st_spider_db_request_key *request_key,
   int *err
 ) {
@@ -1786,7 +1787,7 @@ spider_db_result *spider_db_odbc::use_result(
       DBUG_RETURN(NULL);
     }
     result->set_limit(limit);
-    result->spider = (ha_spider *) request_key->handler;
+    result->spider = spider;
   } else {
     *err = HA_ERR_OUT_OF_MEM;
   }

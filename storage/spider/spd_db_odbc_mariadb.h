@@ -88,6 +88,7 @@ public:
     int *err
   );
   virtual spider_db_result *use_result(
+    ha_spider *spider,
     st_spider_db_request_key *request_key,
     int *err
   );
