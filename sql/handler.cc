@@ -63,10 +63,10 @@
 #include "wsrep_thd.h"
 #include "wsrep_trans_observer.h" /* wsrep transaction hooks */
 #include "wsrep_var.h"            /* wsrep_hton_check() */
-#endif /* WITH_WSREP */
 
 /* for updating local_seqno if node is doing xarecovery after SST donation */
 extern wsrep_seqno_t local_seqno;
+#endif /* WITH_WSREP */
 
 /**
   @def MYSQL_TABLE_LOCK_WAIT
