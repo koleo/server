@@ -577,25 +577,6 @@ Description: MariaDB ColumnStore storage engine
  analytical engine, aimed at rapid processing of analytical queries on very
  large amounts of data.
 
-Package: mariadb-plugin-oqgraph
-Architecture: any
-Depends: libjudydebian1,
-         mariadb-server-10.6 (= ${binary:Version}),
-         ${misc:Depends},
-         ${shlibs:Depends}
-Breaks: mariadb-oqgraph-engine-10.1,
-        mariadb-oqgraph-engine-10.2,
-        mariadb-oqgraph-engine-10.3,
-        mariadb-oqgraph-engine-10.4
-Replaces: mariadb-oqgraph-engine-10.1,
-          mariadb-oqgraph-engine-10.2,
-          mariadb-oqgraph-engine-10.3,
-          mariadb-oqgraph-engine-10.4
-Description: OQGraph storage engine for MariaDB
- The OQGraph engine is a computation engine plugin for handling hierarchies
- (trees) and graphs (friend-of-a-friend, etc) cleanly through standard SQL.
- This package contains the OQGraph plugin for MariaDB.
-
 Package: mariadb-plugin-mroonga
 Architecture: any-alpha any-amd64 any-arm any-arm64 any-i386 any-ia64 any-mips64el any-mips64r6el any-mipsel any-mipsr6el any-nios2 any-powerpcel any-ppc64el any-sh3 any-sh4 any-tilegx
 Depends: mariadb-server-10.6 (= ${binary:Version}),
