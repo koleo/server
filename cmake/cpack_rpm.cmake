@@ -124,9 +124,12 @@ SET(ignored
   "%ignore ${CMAKE_INSTALL_PREFIX}/share/man"
   "%ignore ${CMAKE_INSTALL_PREFIX}/share/man/man1"
   "%ignore ${CMAKE_INSTALL_PREFIX}/share/man/man8"
+  "%ignore ${CMAKE_INSTALL_PREFIX}/share/man/man1"
   "%ignore ${CMAKE_INSTALL_PREFIX}/share/man/man1*"
+  "%ignore ${CMAKE_INSTALL_PREFIX}/share/man/man8"
   "%ignore ${CMAKE_INSTALL_PREFIX}/share/man/man8*"
   "%ignore ${CMAKE_INSTALL_PREFIX}/share/pkgconfig"
+  "%ignore ${CMAKE_INSTALL_PREFIX}/lib64/pkgconfig"
   )
 
 SET(CPACK_RPM_server_USER_FILELIST ${ignored} "%config(noreplace) ${INSTALL_SYSCONF2DIR}/*")
