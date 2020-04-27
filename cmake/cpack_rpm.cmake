@@ -299,6 +299,9 @@ IF(compat53 AND compat101)
     SET(CPACK_RPM_common_PACKAGE_REQUIRES "MariaDB-compat")
     SET(CPACK_RPM_compat_PACKAGE_CONFLICTS "mariadb-libs < 1:10.1.0")
   ENDIF()
+  IF(RPM MATCHES "sles15")
+    SETA(CPACK_RPM_shared_PACKAGE_OBSOLETES "libmariadb3")
+  ENDIF()
 ENDIF()
 
 ################
