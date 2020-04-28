@@ -1,0 +1,10 @@
+!include include/default_mysqld.cnf
+!include ../my_1_1.cnf
+!include ../my_2_1.cnf
+!include ../my_2_2.cnf
+!include ../my_2_3.cnf
+[mysqld.1.1]
+loose_spider_bgs_mode=    2
+
+[ENV]
+USE_CHILD_GROUP2=         1
