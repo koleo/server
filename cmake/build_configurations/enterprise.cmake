@@ -44,6 +44,8 @@ SET(CPACK_PACKAGE_DESCRIPTION "MariaDB Enterprise Server: a very fast and robust
 # here we're going to unconditionally redefine default source package name
 # set in mysql_version.cmake:87
 SET(CPACK_SOURCE_PACKAGE_FILE_NAME "mariadb${MYSQL_SERVER_SUFFIX}-${VERSION}")
+SET(CPACK_PACKAGE_FILE_NAME "mariadb${MYSQL_SERVER_SUFFIX}${PRODUCT_TAG}-${VERSION}-${SYSTEM_NAME_AND_PROCESSOR}" CACHE STRING "binary package name")
+MESSAGE(STATUS "Packaging as: ${CPACK_PACKAGE_FILE_NAME}")
 
 IF(WIN32)
   SET(MSVC_CRT_TYPE /MT CACHE STRING   "Runtime library - specify runtime library for linking (/MT,/MTd,/MD,/MDd)")
