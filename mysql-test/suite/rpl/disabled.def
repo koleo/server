@@ -20,3 +20,7 @@ rpl_slave_grp_exec: MDEV-10514
 rpl_auto_increment_update_failure  : disabled for now
 rpl_current_user          : waits for MDEV-22374 fix
 rpl_parallel2             : waits for MDEV-23089
+rpl_skip_replication             : MDEV-13258
+rpl_set_statement_default_master : MDEV-13258
+rpl_extra_col_master_myisam      : MDEV-14203
+rpl_slave_load_tmpdir_not_exist  : MDEV-14203
