@@ -18269,6 +18269,15 @@ buffer_pool_load_abort(
 	}
 }
 
+/** Starts async log file resizing */
+static void innodb_log_file_size_update(THD *thd, st_mysql_sys_var *, void *,
+                                        const void *save)
+{
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+  redo::file_size_changer.request(*static_cast<const ulonglong *>(save));
+  mysql_mutex_lock(&LOCK_global_system_variables);
+}
+
 /****************************************************************//**
 Update the system variable innodb_log_write_ahead_size using the "saved"
 value. This function is registered as a callback with MySQL. */
@@ -19223,10 +19232,10 @@ static MYSQL_SYSVAR_ULONG(log_buffer_size, srv_log_buffer_size,
   NULL, NULL, 16L << 20, 256L << 10, LONG_MAX, 1024);
 
 static MYSQL_SYSVAR_ULONGLONG(log_file_size, srv_log_file_size,
-  PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+  PLUGIN_VAR_RQCMDARG,
   "Size of each log file in a log group.",
-  NULL, NULL, 96 << 20, 1 << 20, std::numeric_limits<ulonglong>::max(),
-  UNIV_PAGE_SIZE_MAX);
+  nullptr, innodb_log_file_size_update, 96 << 20, 1 << 20,
+  std::numeric_limits<ulonglong>::max(), UNIV_PAGE_SIZE_MAX);
 
 static MYSQL_SYSVAR_ULONG(log_write_ahead_size, srv_log_write_ahead_size,
   PLUGIN_VAR_RQCMDARG,

@@ -52,6 +52,7 @@ Created 12/9/1995 Heikki Tuuri
 #include "srv0mon.h"
 #include "buf0dump.h"
 #include "log0sync.h"
+#include "tpool.h"
 
 /*
 General philosophy of InnoDB redo-logs:
@@ -421,45 +422,58 @@ function_exit:
 	return(lsn);
 }
 
+static lsn_t compute_smallest_capacity(size_t file_size)
+{
+  lsn_t result = file_size - LOG_FILE_HDR_SIZE;
+  /* Add extra safety */
+  return result - result / 10;
+}
+
+static size_t required_log_size()
+{
+  /* Margin for the free space in the smallest log, before a new query
+  step which modifies the database, is started */
+  const size_t LOG_CHECKPOINT_FREE_PER_THREAD = 4U << srv_page_size_shift;
+  const size_t LOG_CHECKPOINT_EXTRA_FREE = 8U << srv_page_size_shift;
+
+  /* For each OS thread we must reserve so much free space in the
+  smallest log group that it can accommodate the log entries produced
+  by single query steps: running out of free log space is a serious
+  system error which requires rebooting the database. */
+
+  return LOG_CHECKPOINT_FREE_PER_THREAD * 10 +
+      LOG_CHECKPOINT_EXTRA_FREE;
+}
+
 /** Calculate the recommended highest values for lsn - last_checkpoint_lsn
 and lsn - buf_pool.get_oldest_modification().
 @param[in]	file_size	requested innodb_log_file_size
+@param[in]	lock		lock mutex or not
 @retval true on success
 @retval false if the smallest log group is too small to
 accommodate the number of OS threads in the database server */
 bool
-log_set_capacity(ulonglong file_size)
+log_set_capacity(ulonglong file_size, bool lock)
 {
-	/* Margin for the free space in the smallest log, before a new query
-	step which modifies the database, is started */
-	const size_t LOG_CHECKPOINT_FREE_PER_THREAD = 4U
-						      << srv_page_size_shift;
-	const size_t LOG_CHECKPOINT_EXTRA_FREE = 8U << srv_page_size_shift;
+	if (!lock) {
+		ut_ad(log_mutex_own());
+	}
 
-	lsn_t		margin;
-	ulint		free;
+	lsn_t smallest_capacity = compute_smallest_capacity(file_size);
+	size_t free = required_log_size();
 
-	lsn_t smallest_capacity = file_size - LOG_FILE_HDR_SIZE;
-	/* Add extra safety */
-	smallest_capacity -= smallest_capacity / 10;
-
-	/* For each OS thread we must reserve so much free space in the
-	smallest log group that it can accommodate the log entries produced
-	by single query steps: running out of free log space is a serious
-	system error which requires rebooting the database. */
-
-	free = LOG_CHECKPOINT_FREE_PER_THREAD * 10
-		+ LOG_CHECKPOINT_EXTRA_FREE;
 	if (free >= smallest_capacity / 2) {
 		ib::error() << "innodb_log_file_size is too small. "
 			    << INNODB_PARAMETERS_MSG;
 		return false;
 	}
 
-	margin = smallest_capacity - free;
+	lsn_t margin = smallest_capacity - free;
 	margin = margin - margin / 10;	/* Add still some extra safety */
 
-	log_mutex_enter();
+	if (lock) {
+		log_mutex_enter();
+	}
 
 	log_sys.log_capacity = smallest_capacity;
 
@@ -472,7 +486,9 @@ log_set_capacity(ulonglong file_size)
 		/ LOG_POOL_CHECKPOINT_RATIO_ASYNC;
 	log_sys.max_checkpoint_age = margin;
 
-	log_mutex_exit();
+	if (lock) {
+		log_mutex_exit();
+	}
 
 	return(true);
 }
@@ -756,6 +772,21 @@ void log_t::file::open_file(std::string path)
     ib::fatal() << "open(" << fd.get_path() << ") returned " << err;
 }
 
+void log_t::file::adopt_future_file()
+{
+  ut_ad(log_mutex_own());
+
+  log_sys.log.future_fd_exists = false;
+  fd= std::move(future_fd);
+  file_size= future_file_size;
+  srv_log_file_size= future_file_size;
+  ut_ad(log_set_capacity(future_file_size, false));
+
+  ib::info() << "innodb_log_file_size changed to " << file_size;
+
+  redo::file_size_changer.remove_file_async();
+}
+
 /** Update the log block checksum. */
 static void log_block_store_checksum(byte* block)
 {
@@ -827,6 +858,19 @@ void log_t::file::close_file()
       ib::fatal() << "close(" << fd.get_path() << ") returned " << err;
   }
   fd.free();                                    // Free path
+
+  if (future_fd_exists)
+  {
+    ib::info() << "server is shutting down while new redo file still exists";
+    ut_ad(future_fd.is_opened());
+    if (const dberr_t err= future_fd.close())
+      ib::warn() << "close(" << future_fd.get_path() << ") returned " << err;
+    // file_changer_t::actual_resizer() might wait for notification for
+    // old file removal here. In case log_checkpoint() didn't notify it yet,
+    // let's do in here to prevent an infinite
+    // file_changer_t::wait_and_remove_file() on a server shutdown
+    redo::file_size_changer.remove_file_async();
+  }
 }
 
 /** Initialize the redo log. */
@@ -964,6 +1008,55 @@ log_buffer_switch()
 	log_sys.buf_next_to_write = log_sys.buf_free;
 }
 
+static void future_log_write(span<byte> buf)
+{
+  ut_ad(buf.size() <= log_sys.log.future_file_size - LOG_FILE_HDR_SIZE);
+
+  size_t write_size= buf.size();
+  ut_ad(write_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+  const byte *write_this= buf.data();
+  ut_ad(reinterpret_cast<uintptr_t>(write_this) % OS_FILE_LOG_BLOCK_SIZE == 0);
+  const auto file_size= log_sys.log.future_file_size;
+  ut_ad(file_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+  const lsn_t aligned_lsn= ut_uint64_align_down(log_sys.write_lsn,
+                                                OS_FILE_LOG_BLOCK_SIZE);
+  os_offset_t offset= log_sys.log.calc_lsn_offset_future(aligned_lsn,
+                                                         file_size);
+
+  log_mutex_enter();
+  if (!log_sys.log.future_fd_exists)
+  {
+    log_mutex_exit();
+    return;
+  }
+
+  log_sys.log.future_file_start_lsn= std::min(log_sys.log.future_file_start_lsn,
+                                              aligned_lsn);
+
+  file_io &fd= log_sys.log.future_fd.get_internal_file();
+  std::string path_str= log_sys.log.future_fd.get_path();
+  const char *path= path_str.c_str();
+  log_mutex_exit();
+
+  if (offset + write_size > file_size)
+  {
+    auto partial_size= file_size - offset;
+    ut_ad(partial_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+
+    ut_ad(offset + partial_size <= file_size);
+    if (dberr_t err= fd.write(path, offset, {write_this, partial_size}))
+      ib::fatal() << "write() to a future log file failed with " << err;
+
+    write_size-= partial_size;
+    write_this+= partial_size;
+    offset= LOG_FILE_HDR_SIZE;
+  }
+
+  ut_ad(offset + write_size <= file_size);
+  if (dberr_t err= fd.write(path, offset, {write_this, write_size}))
+    ib::fatal() << "write() to a future log file failed with " << err;
+}
+
 /**
 Writes log buffer to disk
 which is the "write" part of log_write_up_to().
@@ -1064,6 +1157,12 @@ static void log_write(bool rotate_key)
 		ut_uint64_align_down(log_sys.write_lsn,
 				     OS_FILE_LOG_BLOCK_SIZE),
 		start_offset - area_start);
+
+	if (log_sys.log.future_fd_exists) {
+		future_log_write({write_buf + area_start,
+				  area_end - area_start});
+	}
+
 	srv_stats.log_padded.add(pad_size);
 	log_sys.write_lsn = write_lsn;
 	if (log_sys.log.writes_are_durable())
@@ -1234,7 +1333,7 @@ static bool log_preflush_pool_modified_pages(lsn_t new_oldest)
 }
 
 /** Write checkpoint info to the log header and invoke log_mutex_exit().
-@param[in]	end_lsn	start LSN of the FILE_CHECKPOINT mini-transaction */
+@param  end_lsn            start LSN of the FILE_CHECKPOINT mini-transaction */
 void log_write_checkpoint_info(lsn_t end_lsn)
 {
 	ut_ad(log_mutex_own());
@@ -1285,6 +1384,44 @@ void log_write_checkpoint_info(lsn_t end_lsn)
 	log_sys.log.flush();
 
 	log_mutex_enter();
+
+	if (log_sys.log.future_fd_exists &&
+	    log_sys.log.future_file_start_lsn <= log_sys.next_checkpoint_lsn) {
+		// At this point new file must contain all the data
+		// covered by current checkpoint
+
+		if (dberr_t err = log_sys.log.future_fd.write(
+			    (log_sys.next_checkpoint_no & 1)
+				    ? LOG_CHECKPOINT_2
+				    : LOG_CHECKPOINT_1,
+			    {buf, OS_FILE_LOG_BLOCK_SIZE})) {
+			ib::fatal() << "checkpoint write to a new redo file"
+				       " failed with "
+				    << err;
+		}
+		if (dberr_t err = log_sys.log.future_fd.flush()) {
+			ib::fatal() << "flush to a new redo file failed with "
+				    << err;
+		}
+
+		if (dberr_t err = log_sys.log.rename(get_log_file_path(
+			    redo::file_changer_t::TO_REMOVE_FILE_NAME))) {
+			ib::fatal()
+				<< "rename(" << LOG_FILE_NAME << ", "
+				<< redo::file_changer_t::TO_REMOVE_FILE_NAME
+				<< ") failed with " << err;
+		}
+
+		if (dberr_t err = log_sys.log.future_fd.rename(
+			    get_log_file_path(LOG_FILE_NAME))) {
+			ib::fatal() << "rename("
+				    << redo::file_changer_t::RESIZE_FILE_NAME
+				    << ", " << LOG_FILE_NAME
+				    << ") failed with " << err;
+		}
+
+		log_sys.log.adopt_future_file();
+	}
 
 	--log_sys.n_pending_checkpoint_writes;
 	ut_ad(log_sys.n_pending_checkpoint_writes == 0);
@@ -1383,6 +1520,19 @@ bool log_checkpoint()
 	const bool	do_write
 		= srv_shutdown_state <= SRV_SHUTDOWN_INITIATED
 		|| flush_lsn != end_lsn;
+
+	if (!do_write && log_sys.log.future_fd_exists) {
+		// On a clean shutdown there is no sense to change file size.
+		// Also, it may result in an empty redo log,
+		// which is incorrect.
+		log_sys.log.future_fd.close();
+		if (redo::file_changer_t::need_to_remove_an_old_file()) {
+			redo::remove_file(
+				redo::file_changer_t::TO_REMOVE_FILE_NAME);
+		}
+		log_sys.log.future_fd_exists = false;
+		redo::file_size_changer.remove_file_async();
+	}
 
 	if (fil_names_clear(flush_lsn, do_write)) {
 		flush_lsn = log_sys.get_lsn();
@@ -1877,3 +2027,184 @@ std::vector<std::string> get_existing_log_files_paths() {
 
   return result;
 }
+
+namespace redo
+{
+
+const char file_changer_t::RESIZE_FILE_NAME[]= "ib_logresized";
+const char file_changer_t::NOT_READY_FILE_NAME[]= "ib_lognotready";
+const char file_changer_t::TO_REMOVE_FILE_NAME[]= "ib_logtoremove";
+
+void file_changer_t::actual_resizer(void *)
+{
+  if (srv_read_only_mode)
+    return;
+
+  os_offset_t size;
+  {
+    std::lock_guard<std::mutex> lock(file_size_changer.m_mutex);
+    if (!file_size_changer.m_resize_requested)
+      return;
+
+    size= file_size_changer.m_size;
+    file_size_changer.m_resize_requested= false;
+  }
+
+  if (required_log_size() >= compute_smallest_capacity(size) / 2)
+  {
+    ib::warn() << "Required redo log size " << size << " is too small";
+    return;
+  }
+
+  auto path= get_log_file_path(NOT_READY_FILE_NAME);
+
+  bool ret;
+  pfs_os_file_t file=
+      os_file_create(innodb_log_file_key, path.c_str(),
+                     OS_FILE_OVERWRITE | OS_FILE_ON_ERROR_NO_EXIT,
+                     OS_FILE_NORMAL, OS_LOG_FILE, false, &ret);
+
+  if (!ret)
+  {
+    ib::warn() << "Cannot create " << path;
+    return;
+  }
+
+  // This guy zeroes the file.
+  ret= os_file_set_size(path.c_str(), file, size, false);
+  if (!ret)
+  {
+    ib::warn() << "Cannot resize " << path << " to " << size
+               << " bytes. Removing file.";
+    remove_file(NOT_READY_FILE_NAME);
+    return;
+  }
+
+  if (!os_file_close(file))
+  {
+    ib::warn() << "Error while closing " << path << ". Removing file.";
+    remove_file(NOT_READY_FILE_NAME);
+    return;
+  }
+
+  {
+    std::unique_lock<std::mutex> _(file_size_changer.m_mutex);
+
+    remove_file(RESIZE_FILE_NAME);
+
+    auto final_path= get_log_file_path(RESIZE_FILE_NAME);
+    if (!os_file_rename(OS_LOG_FILE, path.c_str(), final_path.c_str()))
+    {
+      ib::warn() << "Cannot rename " << path << " to " << final_path
+                 << ". Removing file.";
+      remove_file(NOT_READY_FILE_NAME);
+      return;
+    }
+
+    alignas(OS_FILE_LOG_BLOCK_SIZE) byte buf[OS_FILE_LOG_BLOCK_SIZE]= {0};
+
+    mach_write_to_4(buf + LOG_HEADER_FORMAT, log_sys.log.format);
+    mach_write_to_4(buf + LOG_HEADER_SUBFORMAT, log_sys.log.subformat);
+    mach_write_to_8(buf + LOG_HEADER_START_LSN, log_sys.get_lsn());
+    strcpy(reinterpret_cast<char *>(buf) + LOG_HEADER_CREATOR,
+           LOG_HEADER_CREATOR_CURRENT);
+    ut_ad(LOG_HEADER_CREATOR_END - LOG_HEADER_CREATOR >=
+          sizeof LOG_HEADER_CREATOR_CURRENT);
+    log_block_store_checksum(buf);
+
+    log_file_t fd(final_path);
+    if (dberr_t err= fd.open(false))
+    {
+      ib::warn() << "Cannot open (error: " << err << ") " << final_path
+                 << ". Removing file.";
+      remove_file(RESIZE_FILE_NAME);
+      return;
+    }
+    if (dberr_t err= fd.write(0, {&buf[0], sizeof buf}))
+    {
+      ib::warn() << "Cannot write (error: " << err << ") to " << final_path
+                 << ". Removing file.";
+      remove_file(RESIZE_FILE_NAME);
+      return;
+    }
+    if (dberr_t err= fd.flush())
+    {
+      ib::warn() << "Cannot write (error: " << err << ") to " << final_path
+                 << ". Removing file.";
+      remove_file(RESIZE_FILE_NAME);
+      return;
+    }
+
+    if (srv_shutdown_state != SRV_SHUTDOWN_NONE)
+      return;
+
+    log_sys.log.future_fd= std::move(fd);
+    log_sys.log.future_file_size= size;
+    if (size < log_sys.log.file_size)
+      ut_ad(log_set_capacity(size, true));
+    log_sys.log.future_file_start_lsn= std::numeric_limits<lsn_t>::max();
+    log_sys.log.future_fd_exists= true;
+  }
+
+  file_size_changer.wait_and_remove_file();
+}
+
+tpool::task_group resizer_group(1);
+tpool::task log_file_resize_task(file_changer_t::actual_resizer, nullptr,
+                                 &resizer_group);
+
+void file_changer_t::request(os_offset_t size)
+{
+  std::lock_guard<std::mutex> _(m_mutex);
+  m_size= size;
+  m_resize_requested= true;
+  srv_thread_pool->submit_task(&log_file_resize_task);
+}
+
+bool file_changer_t::new_file_is_available() const
+{
+  std::lock_guard<std::mutex> _(m_mutex);
+  bool exists;
+  os_file_type_t type;
+  if (!os_file_status(get_log_file_path(RESIZE_FILE_NAME).c_str(), &exists,
+                      &type))
+  {
+    ib::warn() << "os_file_status() failed";
+    return false;
+  }
+  return exists;
+}
+
+void file_changer_t::remove_file_async()
+{
+  {
+    std::lock_guard<std::mutex> _(m_mutex);
+    ut_ad(m_remove_file == false);
+    m_remove_file= true;
+  }
+  m_cv.notify_one();
+}
+
+void file_changer_t::wait_and_remove_file()
+{
+  std::unique_lock<std::mutex> lock(m_mutex);
+  m_cv.wait(lock, [this]() { return m_remove_file; });
+  if (need_to_remove_an_old_file())
+    remove_file(TO_REMOVE_FILE_NAME);
+  m_remove_file= false;
+}
+
+bool file_changer_t::need_to_remove_an_old_file()
+{
+  return srv_shutdown_state == SRV_SHUTDOWN_NONE || srv_fast_shutdown < 2;
+}
+
+file_changer_t file_size_changer;
+
+void remove_file(const char *file_name)
+{
+  os_file_delete_if_exists(innodb_log_file_key,
+                           get_log_file_path(file_name).c_str(), nullptr);
+}
+
+} // namespace redo

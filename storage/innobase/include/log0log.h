@@ -41,6 +41,8 @@ Created 12/9/1995 Heikki Tuuri
 #include <atomic>
 #include <vector>
 #include <string>
+#include <mutex>
+#include <condition_variable>
 
 using st_::span;
 
@@ -135,11 +137,11 @@ log_get_max_modified_age_async(void);
 /** Calculate the recommended highest values for lsn - last_checkpoint_lsn
 and lsn - buf_pool.get_oldest_modification().
 @param[in]	file_size	requested innodb_log_file_size
+@param[in]	lock		lock mutex or not
 @retval true on success
 @retval false if the smallest log is too small to
 accommodate the number of OS threads in the database server */
-bool
-log_set_capacity(ulonglong file_size)
+bool log_set_capacity(ulonglong file_size, bool lock= true)
 	MY_ATTRIBUTE((warn_unused_result));
 
 /** Ensure that the log has been written to the log file up to a given
@@ -173,7 +175,7 @@ void log_make_checkpoint();
 void logs_empty_and_mark_files_at_shutdown();
 
 /** Write checkpoint info to the log header and invoke log_mutex_exit().
-@param[in]	end_lsn	start LSN of the FILE_CHECKPOINT mini-transaction */
+@param  end_lsn            start LSN of the FILE_CHECKPOINT mini-transaction */
 void log_write_checkpoint_info(lsn_t end_lsn);
 
 /**
@@ -485,6 +487,7 @@ public:
     m_path.clear();
     m_path.shrink_to_fit();
   }
+  file_io &get_internal_file() { return *m_file.get(); }
 
 private:
   std::unique_ptr<file_io> m_file;
@@ -565,12 +568,23 @@ public:
     log_file_t				fd;
 
   public:
+    /** whether redo log resizer thread prepared a new redo file */
+    std::atomic<bool> future_fd_exists{false};
+    /** size of a new redo file */
+    os_offset_t future_file_size{0};
+    /** a new redo file descriptor */
+    log_file_t future_fd;
+    /** future file replicated log since that LSN */
+    lsn_t future_file_start_lsn{std::numeric_limits<lsn_t>::max()};
+
     /** used only in recovery: recovery scan succeeded up to this
     lsn in this log group */
     lsn_t				scanned_lsn;
 
     /** opens log file which must be closed prior this call */
     void open_file(std::string path);
+    /** swaps old and new redo files, updates some log_t variables */
+    void adopt_future_file();
     /** writes header */
     void write_header_durable(lsn_t lsn);
     /** opens log file which must be closed prior this call */
@@ -601,6 +615,11 @@ public:
     @param[in]	lsn	log sequence number
     @return offset within the log */
     inline lsn_t calc_lsn_offset(lsn_t lsn) const;
+    /** Calculate the offset of a log sequence number for a given file size.
+    @param  lsn        log sequence number
+    @param  file_size  file_size
+    @return offset within the log */
+    inline lsn_t calc_lsn_offset_future(lsn_t lsn, os_offset_t file_size) const;
     inline lsn_t calc_lsn_offset_old(lsn_t lsn) const;
 
     /** Set the field values to correspond to a given lsn. */
@@ -810,6 +829,26 @@ inline lsn_t log_t::file::calc_lsn_offset(lsn_t lsn) const
   return l + LOG_FILE_HDR_SIZE * (1 + l / (file_size - LOG_FILE_HDR_SIZE));
 }
 
+inline lsn_t log_t::file::calc_lsn_offset_future(lsn_t lsn,
+                                                 os_offset_t file_size) const
+{
+  ut_ad(this == &log_sys.log);
+  /* The lsn parameters are updated while holding both the mutexes
+  and it is ok to have either of them while reading */
+  ut_ad(log_sys.mutex.is_owned() || log_write_lock_own());
+  const lsn_t size= file_size - LOG_FILE_HDR_SIZE;
+  lsn_t l= lsn - this->lsn;
+  if (longlong(l) < 0)
+  {
+    l= lsn_t(-longlong(l)) % size;
+    l= size - l;
+  }
+
+  l+= lsn_offset - LOG_FILE_HDR_SIZE * (1 + lsn_offset / file_size);
+  l%= size;
+  return l + LOG_FILE_HDR_SIZE * (1 + l / (file_size - LOG_FILE_HDR_SIZE));
+}
+
 inline void log_t::file::set_lsn(lsn_t a_lsn) {
       ut_ad(log_sys.mutex.is_owned() || log_write_lock_own());
       lsn = a_lsn;
@@ -844,6 +883,90 @@ inline void log_t::file::set_lsn_offset(lsn_t a_lsn) {
 
 /** Release the log sys mutex. */
 #define log_mutex_exit() mutex_exit(&log_sys.mutex)
+
+namespace redo
+{
+
+/** this class creates a new redo log file and deletes an old one
+
+SET GLOBAL innodb_log_file_size = ... calls file_size_t::request()
+
+request() starts a task on srv_thread_pool. tpool::task_group ensures
+that only one such task may exists simultaneously. It's a major point
+because user can SET GLOBAL several times in a row. All request will
+be queued by task_group and executed one by one.
+
+Task creates a new file, resize it and fill with zeroes. Than, it notifies
+log_sys that a new file has arrived by setting log_t::file::future_fd_exists.
+log_sys start replicating all log to a new file. And our task wait for arrival
+of the old redo log file.
+
+At the next checkpoint log_sys performs a file rotation. But only if a new file
+didn't arrive too late. For that purpose it checks for
+log_t::file::future_fd_exists early in log_checkpoint() to ensure that
+FILE_CHECKPOINT and such stuff will be written to it.
+
+File rotation is file renames: current -> old, new -> current and update of
+some fields in log_sys like log_t::file::file_size and log_t::file::fd.
+That happens in log_t::file::adopt_future_file()
+
+At the end log_t::file::adopt_future_file() notifies file_changer_t that
+it's time to unlink an old file. file_changer_t::m_remove_file and
+file_changer_t::m_cv are used for that purpose.
+
+After receiving a notification that file_changer_t::m_remove_file == true,
+task unlinks an old file and that's it - task is done. Now another such
+task can be executed if user executed more SET GLOBAL innodb_log_file_size
+*/
+class file_changer_t
+{
+public:
+  static const char RESIZE_FILE_NAME[];
+  static const char NOT_READY_FILE_NAME[];
+  static const char TO_REMOVE_FILE_NAME[];
+
+  /** Creates new file, resizes it, zeroes it, notifies log_t and
+  removes an old log file. All work is done in tpool. */
+  static void actual_resizer(void *);
+  /** Initiates async log resizing work */
+  void request(os_offset_t size);
+  /** Checks whether RESIZE_FILE_NAME exists */
+  bool new_file_is_available() const;
+  /** Request removing of an old redo file */
+  void remove_file_async();
+  /** Waits for old redo file to be ready for removal and remove it */
+  void wait_and_remove_file();
+
+  /** Do not remove an old redo file on fast shutdown */
+  static bool need_to_remove_an_old_file();
+
+private:
+  /** Protects everything: all fields are accessed from different threads */
+  mutable std::mutex m_mutex;
+  /** is set by SET GLOBAL innodb_log_file_size */
+  bool m_resize_requested{false};
+  /** is set by SET GLOBAL innodb_log_file_size
+  If user will do several SET GLOBAL innodb_log_file_size this field will be
+  overwritten. We may call this an optimization because that way we omit
+  unnecessary file creation and rotation */
+  os_offset_t m_size{0};
+
+  /** log_t notifies pending task that it's time to unlink an old file via
+  setting this variable to true */
+  bool m_remove_file{false};
+  /** log_t notifies pending task that it's time to unlink an old file using
+  this variable */
+  std::condition_variable m_cv;
+};
+
+extern file_changer_t file_size_changer;
+
+/** Removes redo log file. Works only for redo files because it honors
+innodb_log_file_key by PFS.
+@param  file_name  file to remove*/
+void remove_file(const char *file_name);
+
+} // namespace redo
 
 #include "log0log.ic"
 

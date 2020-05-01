@@ -1076,13 +1076,37 @@ static dberr_t find_and_check_log_file(bool &log_file_found)
 
   auto logfile0= get_log_file_path();
   os_file_stat_t stat_info;
-  const dberr_t err= os_file_get_status(logfile0.c_str(), &stat_info, false,
-                                        srv_read_only_mode);
+  dberr_t err= os_file_get_status(logfile0.c_str(), &stat_info, false,
+                                  srv_read_only_mode);
 
   auto is_operation_restore= []() -> bool {
     return srv_operation == SRV_OPERATION_RESTORE ||
            srv_operation == SRV_OPERATION_RESTORE_EXPORT;
   };
+
+  // What if we crashed right after current log file was renamed in the process
+  // of log file resizinig?
+  if (err == DB_NOT_FOUND)
+  {
+    os_file_type_t _;
+    bool exists;
+    std::string path=
+        get_log_file_path(redo::file_changer_t::TO_REMOVE_FILE_NAME);
+    if (os_file_status(path.c_str(), &exists, &_) && exists)
+    {
+      os_file_rename(innodb_log_file_key, path.c_str(), logfile0.c_str());
+      err= os_file_get_status(logfile0.c_str(), &stat_info, false,
+                              srv_read_only_mode);
+    }
+    else
+    {
+      redo::remove_file(redo::file_changer_t::TO_REMOVE_FILE_NAME);
+    }
+  }
+  else
+  {
+    redo::remove_file(redo::file_changer_t::TO_REMOVE_FILE_NAME);
+  }
 
   if (err == DB_NOT_FOUND)
   {
@@ -1330,6 +1354,9 @@ dberr_t srv_start(bool create_new_db)
 #endif /* UNIV_DEBUG */
 
 	log_sys.create();
+	// Just in case if something is left since the previous run.
+	redo::remove_file(redo::file_changer_t::RESIZE_FILE_NAME);
+	redo::remove_file(redo::file_changer_t::NOT_READY_FILE_NAME);
 	recv_sys.create();
 	lock_sys.create(srv_lock_table_size);
 

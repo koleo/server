@@ -1,0 +1,53 @@
+--source include/have_innodb.inc
+--source include/have_sequence.inc
+
+let SEARCH_FILE = $MYSQLTEST_VARDIR/log/mysqld.1.err;
+
+SET GLOBAL innodb_log_file_size=3145728;
+SHOW VARIABLES LIKE 'innodb_log_file_size';
+
+CREATE TABLE t (
+  a INT PRIMARY KEY AUTO_INCREMENT,
+  b CHAR(255) NOT NULL)
+ENGINE=INNODB;
+
+INSERT INTO t SELECT NULL, REPEAT('a', 255) FROM seq_1_to_20000;
+
+let $wait_timeout = 180;
+let $wait_condition =
+  SELECT global_value = 3145728
+  FROM information_schema.system_variables
+  WHERE variable_name = 'innodb_log_file_size'
+  ORDER BY variable_name;
+--source include/wait_condition.inc
+
+--let $restart_parameters=--innodb-log-file-size=3145728
+--source include/restart_mysqld.inc
+
+SHOW VARIABLES LIKE 'innodb_log_file_size';
+let SEARCH_PATTERN = InnoDB: innodb_log_file_size changed to 3145728;
+--source include/search_pattern_in_file.inc
+
+SET GLOBAL innodb_log_file_size=2097152;
+SHOW VARIABLES LIKE 'innodb_log_file_size';
+
+UPDATE t SET b = REPEAT('a', 255);
+
+let $wait_condition =
+  SELECT global_value = 2097152
+  FROM information_schema.system_variables
+  WHERE variable_name = 'innodb_log_file_size'
+  ORDER BY variable_name;
+--source include/wait_condition.inc
+
+
+--let $restart_parameters=
+--source include/restart_mysqld.inc
+
+SHOW VARIABLES LIKE 'innodb_log_file_size';
+let SEARCH_PATTERN = InnoDB: innodb_log_file_size changed to 2097152;
+--source include/search_pattern_in_file.inc
+
+UPDATE t SET b = REPEAT('a', 255);
+
+DROP TABLE t;
