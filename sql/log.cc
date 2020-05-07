@@ -2147,12 +2147,8 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
   PSI_stage_info org_stage;
   DBUG_ENTER("binlog_commit");
 
-  /* 
-    cache_mngr can be NULL in case if logging is disabled.
-    Still we can have online alter in process
-  */
-
-  for (TABLE *table= thd->open_tables; table;
+  bool is_ending_transaction= ending_trans(thd, all);
+  for (TABLE *table= thd->open_tables; is_ending_transaction && table;
        table= table->next)
   {
     if (!table->online_alter_cache)
@@ -2178,6 +2174,10 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
       error= binlog->flush_and_sync(NULL);
     mysql_mutex_unlock(binlog->get_log_lock());
 
+    table->online_alter_cache->reset();
+    delete table->online_alter_cache;
+    table->online_alter_cache= NULL;
+
     if (error)
     {
       my_error(ER_ERROR_ON_WRITE, MYF(ME_ERROR_LOG), binlog->get_name(), errno);
@@ -2186,7 +2186,9 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
   }
 
   binlog_cache_mngr *const cache_mngr= thd->binlog_get_cache_mngr();
-
+  /*
+    cache_mngr can be NULL in case if binlog logging is disabled.
+  */
   if (!cache_mngr)
   {
     DBUG_ASSERT(WSREP(thd) ||
@@ -2229,7 +2231,7 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
      - We are in a transaction and a full transaction is committed.
     Otherwise, we accumulate the changes.
   */
-  if (likely(!error) && ending_trans(thd, all))
+  if (likely(!error) && is_ending_transaction)
   {
     error= is_preparing_xa(thd) ?
       binlog_commit_flush_xa_prepare(thd, all, cache_mngr) :
@@ -2258,6 +2260,13 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
 static int binlog_rollback(handlerton *hton, THD *thd, bool all)
 {
   DBUG_ENTER("binlog_rollback");
+
+  for (TABLE *table= thd->open_tables; table; table= table->next)
+  {
+    table->online_alter_cache->reset();
+    delete table->online_alter_cache;
+    table->online_alter_cache= NULL;
+  }
 
   int error= 0;
   binlog_cache_mngr *const cache_mngr= thd->binlog_get_cache_mngr();
@@ -5770,8 +5779,10 @@ bool stmt_has_updated_non_trans_table(const THD* thd)
 
 binlog_cache_data *THD::binlog_setup_cache_data(MEM_ROOT *mem_root) 
 {
-  void *cache_buf= alloc_root(mem_root, sizeof(binlog_cache_data));
-  auto *cache= new (cache_buf)binlog_cache_data();
+  auto *cache= new binlog_cache_data();
+  cache->set_binlog_cache_info(max_binlog_stmt_cache_size,
+                               &binlog_stmt_cache_use,
+                               &binlog_stmt_cache_disk_use);
   if (!cache ||
       open_cached_file(&cache->cache_log, mysql_tmpdir,
                        LOG_PREFIX, (size_t)binlog_cache_size, MYF(MY_WME)))

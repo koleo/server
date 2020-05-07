@@ -11705,6 +11705,15 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     error= 1;
   }
 
+  THD_STAGE_INFO(thd, stage_enabling_keys);
+  thd_progress_next_stage(thd);
+
+  if (!ignore)
+    to->file->extra(HA_EXTRA_END_ALTER_COPY);
+
+  cleanup_done= 1;
+  to->file->extra(HA_EXTRA_NO_IGNORE_DUP_KEY);
+
   if (online && error < 0)
   {
     Table_map_log_event table_event(thd, from, from->s->table_map_id,
@@ -11732,7 +11741,8 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     rli.relay_log.description_event_for_exec=
                                             new Format_description_log_event(4);
 
-
+    // We restore bitmaps, because update event is going to mess up with them.
+    to->default_column_bitmaps();
     online_alter_read_from_binlog(thd, &rgi, from->s->online_ater_binlog, &log);
 
 
@@ -11744,16 +11754,8 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     from->s->online_ater_binlog->~MYSQL_BIN_LOG();
     from->s->online_ater_binlog= NULL;
   }
-
   // TODO handle m_vers_from_plain
-  THD_STAGE_INFO(thd, stage_enabling_keys);
-  thd_progress_next_stage(thd);
 
-  if (!ignore)
-    to->file->extra(HA_EXTRA_END_ALTER_COPY);
-
-  cleanup_done= 1;
-  to->file->extra(HA_EXTRA_NO_IGNORE_DUP_KEY);
 
   DEBUG_SYNC(thd, "copy_data_between_tables_before_reset_backup_lock");
   if (backup_reset_alter_copy_lock(thd))
