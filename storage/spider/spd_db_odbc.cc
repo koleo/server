@@ -1758,6 +1758,7 @@ spider_db_result *spider_db_odbc::store_result(
     {
       delete result;
       result = NULL;
+      DBUG_RETURN(NULL);
     }
     result->set_limit(limit);
     result->spider = (ha_spider *) request_key->handler;
