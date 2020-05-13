@@ -113,6 +113,7 @@ SET(ignored
   "%ignore ${CMAKE_INSTALL_PREFIX}/lib"
   "%ignore ${CMAKE_INSTALL_PREFIX}/lib/systemd"
   "%ignore ${CMAKE_INSTALL_PREFIX}/lib/systemd/system"
+  "%ignore ${CMAKE_INSTALL_PREFIX}/lib/sysusers.d"
   "%ignore ${CMAKE_INSTALL_PREFIX}/lib/tmpfiles.d"
   "%ignore ${CMAKE_INSTALL_PREFIX}/lib/sysusers.d"
   "%ignore ${CMAKE_INSTALL_PREFIX}/lib64"
