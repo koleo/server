@@ -18396,24 +18396,6 @@ static struct st_mysql_storage_engine innobase_storage_engine=
 { MYSQL_HANDLERTON_INTERFACE_VERSION };
 
 #ifdef WITH_WSREP
-void
-wsrep_abort_slave_trx(
-/*==================*/
-	wsrep_seqno_t bf_seqno,
-	wsrep_seqno_t victim_seqno)
-{
-	WSREP_ERROR("Trx %lld tries to abort slave trx %lld. This could be "
-		"caused by:\n\t"
-		"1) unsupported configuration options combination, please check documentation.\n\t"
-		"2) a bug in the code.\n\t"
-		"3) a database corruption.\n Node consistency compromized, "
-		"need to abort. Restart the node to resync with cluster.",
-		(long long)bf_seqno, (long long)victim_seqno);
-	abort();
-}
-
-/*******************************************************************//**
-This function is used to kill one transaction in BF. */
 
 /** This function is used to kill one transaction.
 
@@ -18440,8 +18422,10 @@ comparison as in the local certification failure.
 @param[in]	signal		Should victim be signaled */
 UNIV_INTERN
 int
-wsrep_innobase_kill_one_trx(THD* bf_thd, trx_t *victim_trx,
-			    bool signal)
+wsrep_innobase_kill_one_trx(
+	THD* bf_thd,
+	trx_t *victim_trx,
+	bool signal)
 {
 	ut_ad(bf_thd);
 	ut_ad(victim_trx);
