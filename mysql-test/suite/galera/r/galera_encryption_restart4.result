@@ -24,7 +24,7 @@ NOT FOUND /VerySecretMessage/ in galera.cache
 connection node_2;
 # node_2
 call mtr.add_suppression("WSREP: GCache recovery is not supported when encryption is enabled. Recovery will be skipped.");
-call mtr.add_suppression("mysqld: File.*");
+call mtr.add_suppression("mariadbd: File.*");
 call mtr.add_suppression("Plugin 'file_key_management' init function returned error.");
 call mtr.add_suppression("Plugin 'file_key_management' registration as a ENCRYPTION failed.");
 show variables like 'encrypt_binlog';

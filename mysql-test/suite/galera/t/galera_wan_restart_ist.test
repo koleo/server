@@ -22,10 +22,10 @@
 --let $node_4=node_4
 --source include/auto_increment_offset_save.inc
 
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 
 --connection node_1
-CREATE TABLE t1 (f1 INTEGER);
+CREATE TABLE t1 (f1 INTEGER PRIMARY KEY) ENGINE=INNODB;
 INSERT INTO t1 VALUES (1);
 
 --connection node_2
@@ -127,19 +127,28 @@ INSERT INTO t1 VALUES (341);
 --let $wait_condition = SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
 --source include/wait_condition.inc
 
-SELECT COUNT(*) = 19 FROM t1;
+--let $wait_condition = SELECT COUNT(*)=19 FROM t1
+--source include/wait_condition.inc
+
+SELECT COUNT(*) AS EXPECT_19 FROM t1;
 
 --connection node_2
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-SELECT COUNT(*) = 19 FROM t1;
+--let $wait_condition = SELECT COUNT(*)=19 FROM t1
+--source include/wait_condition.inc
+SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT COUNT(*) AS EXPECT_19 FROM t1;
 
 --connection node_3
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-SELECT COUNT(*) = 19 FROM t1;
+--let $wait_condition = SELECT COUNT(*)=19 FROM t1
+--source include/wait_condition.inc
+SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT COUNT(*) AS EXPECT_19 FROM t1;
 
 --connection node_4
-SELECT VARIABLE_VALUE = 4 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-SELECT COUNT(*) = 19 FROM t1;
+--let $wait_condition = SELECT COUNT(*)=19 FROM t1
+--source include/wait_condition.inc
+SELECT VARIABLE_VALUE FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+SELECT COUNT(*) AS EXPECT_19 FROM t1;
 
 --connection node_1
 DROP TABLE t1;
