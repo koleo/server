@@ -40,3 +40,28 @@ utf8mb4_string	xxx😎yyy
 #
 # End of 10.1 tests
 #
+#
+# MENT-360: ASAN heap-use-after-free in strmake_root /
+# Query_arena::strmake
+#
+CREATE PROCEDURE pr1()
+BEGIN
+DECLARE CONTINUE HANDLER FOR 1146 SET @a = 1;
+DECLARE CONTINUE HANDLER FOR 1243 SET @a = 1;
+LOOP
+PREPARE stmt FROM "CREATE TEMPORARY TABLE ps AS SELECT * FROM non_existing_table";
+EXECUTE stmt;
+END LOOP;
+END $
+connect con1,localhost,root,,;
+SET DEBUG_SYNC= 'after_removing_statement SIGNAL in_sync WAIT_FOR forever';
+CALL pr1();
+connection default;
+SET DEBUG_SYNC= 'now WAIT_FOR in_sync';
+SHOW FULL PROCESSLIST;
+SET DEBUG_SYNC = 'RESET';
+disconnect con1;
+DROP PROCEDURE pr1;
+#
+# end of Enterprise tests
+#

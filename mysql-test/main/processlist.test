@@ -70,3 +70,44 @@ SELECT INFO, INFO_BINARY, 'xxx😎yyy' AS utf8mb4_string FROM INFORMATION_SCHEMA
 --echo #
 --echo # End of 10.1 tests
 --echo #
+
+--echo #
+--echo # MENT-360: ASAN heap-use-after-free in strmake_root /
+--echo # Query_arena::strmake
+--echo #
+
+delimiter $;
+
+CREATE PROCEDURE pr1()
+BEGIN
+    DECLARE CONTINUE HANDLER FOR 1146 SET @a = 1;
+    DECLARE CONTINUE HANDLER FOR 1243 SET @a = 1;
+    LOOP
+        PREPARE stmt FROM "CREATE TEMPORARY TABLE ps AS SELECT * FROM non_existing_table";
+        EXECUTE stmt;
+    END LOOP;
+END $
+
+delimiter ;$
+
+connect(con1,localhost,root,,);
+SET DEBUG_SYNC= 'after_removing_statement SIGNAL in_sync WAIT_FOR forever';
+--send CALL pr1()
+
+connection default;
+
+SET DEBUG_SYNC= 'now WAIT_FOR in_sync';
+
+--disable_result_log
+SHOW FULL PROCESSLIST;
+--enable_result_log
+
+SET DEBUG_SYNC = 'RESET';
+
+# Cleanup
+disconnect con1;
+DROP PROCEDURE pr1;
+
+--echo #
+--echo # end of Enterprise tests
+--echo #
