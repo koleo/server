@@ -4679,6 +4679,7 @@ sub extract_warning_lines ($$) {
      qr/Detected table cache mutex contention at instance .* waits. Additional table cache instance cannot be activated: consider raising table_open_cache_instances. Number of active instances/,
      qr/WSREP: Failed to guess base node address/,
      qr/WSREP: Guessing address for incoming client/,
+     qr/InnoDB: In RENAME TABLE table .* is referenced in foreign key constraints which are not compatible with the new table definition./
     );
 
   my $matched_lines= [];

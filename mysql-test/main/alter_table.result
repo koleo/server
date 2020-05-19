@@ -3324,3 +3324,21 @@ drop table t1;
 #
 # End of 10.5 tests
 #
+# Start of enterprise tests
+#
+# MENT-416: Table disappears or Assertion
+# `!is_set() || (m_status == DA_OK_BULK && is_bulk_op())'
+# fails upon RENAME TABLE
+#
+SET SESSION FOREIGN_KEY_CHECKS = OFF;
+CREATE TABLE t1 (a INT) ENGINE=InnoDB;
+ALTER TABLE t1 ADD CONSTRAINT FOREIGN KEY (a) REFERENCES t3 (b);
+CREATE TABLE IF NOT EXISTS t2 (b INT) ENGINE=InnoDB;
+ALTER TABLE t2 RENAME TO t3, DROP CONSTRAINT IF EXISTS foo;
+ERROR HY000: Error on rename of XXX (errno: 150 "Foreign key constraint is incorrectly formed")
+SHOW TABLES;
+Tables_in_test
+t1
+t2
+DROP TABLE t1, t2;
+# End of enterprise tests
