@@ -15,9 +15,11 @@ SET GLOBAL log_output = 'TABLE';
 
 INSERT INTO t VALUES (1);
 
---replace_column 1 TIMESTAMP 2 USER_HOST 3 THREAD_ID
+--replace_column 1 TIMESTAMP 2 USER_HOST 3 THREAD_ID 5 Query
 --sorted_result
-SELECT * FROM mysql.general_log WHERE argument LIKE "INSERT INTO %";
+SELECT * FROM mysql.general_log
+  WHERE argument LIKE "INSERT INTO %" AND
+  (command_type = "Query" OR command_type = "Execute") ;
 
 --echo # Insert new row into general_log table after it has been copied on BLOCK_DDL.
 --let after_stage_block_ddl=INSERT INTO test.t VALUES (2)
@@ -33,9 +35,11 @@ SELECT * FROM mysql.general_log WHERE argument LIKE "INSERT INTO %";
 --source include/restart_and_restore.inc
 --enable_result_log
 
+--replace_column 1 TIMESTAMP 2 USER_HOST 3 THREAD_ID 5 Query
 --sorted_result
---replace_column 1 TIMESTAMP 2 USER_HOST 3 THREAD_ID
-SELECT * FROM mysql.general_log WHERE argument LIKE "INSERT INTO %";
+SELECT * FROM mysql.general_log
+  WHERE argument LIKE "INSERT INTO %" AND
+  (command_type = "Query" OR command_type = "Execute") ;
 
 --rmdir $targetdir
 DROP TABLE t;
