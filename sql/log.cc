@@ -2148,25 +2148,13 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
   DBUG_ENTER("binlog_commit");
 
   bool is_ending_transaction= ending_trans(thd, all);
-  for (TABLE *table= thd->open_tables; is_ending_transaction && table;
-       table= table->next)
+  for (TABLE *table= thd->open_tables; table; table= table->next)
   {
     if (!table->online_alter_cache)
       continue;
     auto *binlog= table->s->online_ater_binlog;
     DBUG_ASSERT(binlog);
-    
-    error= binlog_flush_pending_rows_event(thd,
-                                           /*
-                                             do not set STMT_END for last event
-                                             to leave table open in altering thd
-                                           */
-                                           false,
-                                           true,
-                                           binlog,
-                                           table->online_alter_cache);
-    if (unlikely(error))
-      DBUG_RETURN(error);
+
 
     mysql_mutex_lock(binlog->get_log_lock());
     error= binlog->write_cache(thd, &table->online_alter_cache->cache_log);

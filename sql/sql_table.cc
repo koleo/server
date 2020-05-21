@@ -11321,6 +11321,8 @@ static int online_alter_read_from_binlog(THD *thd, rpl_group_info *rgi,
     thd->set_n_backup_active_arena(&event_arena, &backup_arena);
     error= ev->apply_event(rgi);
     thd->restore_active_arena(&event_arena, &backup_arena);
+    if (ev != rgi->rli->relay_log.description_event_for_exec)
+      delete ev;
   }
   while(!error);
 
@@ -11753,6 +11755,9 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
     from->s->online_ater_binlog->cleanup();
     from->s->online_ater_binlog->~MYSQL_BIN_LOG();
     from->s->online_ater_binlog= NULL;
+
+    end_io_cache(&log);
+    mysql_file_close(file, MYF(MY_WME));
   }
   // TODO handle m_vers_from_plain
 

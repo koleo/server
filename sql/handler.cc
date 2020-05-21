@@ -6672,7 +6672,19 @@ static int binlog_log_row_online_alter(TABLE* table,
   int error= (*log_func)(thd, table, table->s->online_ater_binlog,
                          table->online_alter_cache, has_trans,
                          before_record, after_record);
-  return error ? HA_ERR_RBR_LOGGING_FAILED : 0;
+  if (unlikely(error))
+    return HA_ERR_RBR_LOGGING_FAILED;
+
+  error= binlog_flush_pending_rows_event(thd,
+                                         /*
+                                           do not set STMT_END for last event
+                                           to leave table open in altering thd
+                                         */
+                                         false,
+                                         true,
+                                         table->s->online_ater_binlog,
+                                         table->online_alter_cache);
+  return unlikely(error) ? HA_ERR_RBR_LOGGING_FAILED : 0;
 }
 
 

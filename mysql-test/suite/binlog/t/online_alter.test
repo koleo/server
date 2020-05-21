@@ -179,6 +179,9 @@ insert t1 values (3, 33);
 insert t1 values (4, 44);
 insert t1 values (5, 55);
 insert t1 values (6, 66);
+insert t1 values (7, 77);
+insert t1 values (8, 88);
+insert t1 values (9, 99);
 
 --connection con2
 --send
@@ -219,8 +222,27 @@ set debug_sync= 'now SIGNAL end';
 
 --connection default
 --reap
+--sorted_result
 select * from t1;
 
+create or replace table t1 (a int primary key, b int) engine=innodb;
+insert t1 values (1, 11);
+insert t1 values (2, 22);
+insert t1 values (3, 33);
+insert t1 values (4, 44);
+insert t1 values (5, 55);
+insert t1 values (6, 66);
+insert t1 values (7, 77);
+insert t1 values (8, 88);
+insert t1 values (9, 99);
+set autocommit = 0;
+start transaction;
+update t1 set b= 7007 where a = 7;
+--error ER_DUPP_KEY
+update t1 set b= 8008 where a = 8 or a = 9;
+commit;
+set autocommit = 1;
+select * from t1;
 
 --echo # Cleanup
 drop table t1, t2;
