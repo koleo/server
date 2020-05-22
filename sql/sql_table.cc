@@ -11365,11 +11365,6 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
   uint online_alter_sync_period= 0;
   if (online)
   {
-    // MDL_ticket *mdl_ticket= from->mdl_ticket;
-    // if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_EXCLUSIVE,
-    //                                          thd->variables.lock_wait_timeout))
-    //   DBUG_RETURN(1);
-
     from->s->online_ater_binlog= new (alloc_root(thd->mem_root,
                                                  sizeof (MYSQL_BIN_LOG)))
                                  MYSQL_BIN_LOG(&online_alter_sync_period);
@@ -11398,11 +11393,6 @@ copy_data_between_tables(THD *thd, TABLE *from, TABLE *to,
       DBUG_RETURN(1);
 
     from->mdl_ticket->downgrade_lock(MDL_SHARED_UPGRADABLE);
-
-    // if (thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_SHARED_READ,
-    //                                          thd->variables.lock_wait_timeout,
-    //                                          true))
-    //   DBUG_RETURN(1);
   }
 
   if (!(copy= new (thd->mem_root) Copy_field[to->s->fields]))

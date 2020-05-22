@@ -2251,6 +2251,8 @@ static int binlog_rollback(handlerton *hton, THD *thd, bool all)
 
   for (TABLE *table= thd->open_tables; table; table= table->next)
   {
+    if (!table->online_alter_cache)
+      continue;
     table->online_alter_cache->reset();
     delete table->online_alter_cache;
     table->online_alter_cache= NULL;
