@@ -1316,20 +1316,6 @@ int spider_db_odbc::connect(
     }
   }
 
-  net_tmo = conn->net_read_timeout > conn->net_write_timeout ?
-    conn->net_read_timeout : conn->net_write_timeout;
-  ret = SQLSetConnectAttr(hdbc, SQL_ATTR_CONNECTION_TIMEOUT,
-    (SQLPOINTER) (SQLULEN) net_tmo, SQL_IS_UINTEGER);
-  if (ret != SQL_SUCCESS)
-  {
-    DBUG_PRINT("info",("spider ret=%d", ret));
-    if ((stored_error = spider_db_odbc_get_error(ret, SQL_HANDLE_DBC, hdbc,
-      conn, stored_error_msg)))
-    {
-      goto error_set_timeout;
-    }
-  }
-
   /* create connect string */
   use_driver = conn->tgt_default_group_length ? TRUE : FALSE;
   DBUG_PRINT("info",("spider use_driver:%s", use_driver ? "TRUE" : "FALSE"));
@@ -1516,6 +1502,11 @@ int spider_db_odbc::connect(
     }
   }
   my_afree(conn_str);
+
+  net_tmo = conn->net_read_timeout > conn->net_write_timeout ?
+    conn->net_read_timeout : conn->net_write_timeout;
+  (void) SQLSetConnectAttr(hdbc, SQL_ATTR_CONNECTION_TIMEOUT,
+    (SQLPOINTER) (SQLULEN) net_tmo, SQL_IS_UINTEGER);
   DBUG_RETURN(0);
 
 error_connect:
@@ -1589,22 +1580,13 @@ void spider_db_odbc::disconnect()
 
 int spider_db_odbc::set_net_timeout()
 {
-  SQLRETURN ret;
   DBUG_ENTER("spider_db_odbc::set_net_timeout");
   DBUG_PRINT("info",("spider this=%p", this));
   DBUG_PRINT("info",("spider conn=%p", conn));
   SQLUINTEGER net_tmo = conn->net_read_timeout > conn->net_write_timeout ?
     conn->net_read_timeout : conn->net_write_timeout;
-  ret = SQLSetConnectAttr(hdbc, SQL_ATTR_CONNECTION_TIMEOUT,
+  (void) SQLSetConnectAttr(hdbc, SQL_ATTR_CONNECTION_TIMEOUT,
     (SQLPOINTER) (SQLULEN) net_tmo, SQL_IS_UINTEGER);
-  if (ret != SQL_SUCCESS)
-  {
-    if ((stored_error = spider_db_odbc_get_error(ret, SQL_HANDLE_DBC, hdbc,
-      conn, stored_error_msg)))
-    {
-      DBUG_RETURN(stored_error);
-    }
-  }
   DBUG_RETURN(0);
 }
 
@@ -2196,21 +2178,11 @@ int spider_db_odbc::set_wait_timeout(
   int wait_timeout,
   int *need_mon
 ) {
-/*
-  SQLRETURN ret;
   SQLUINTEGER tot = wait_timeout;
-*/
   DBUG_ENTER("spider_db_odbc::set_wait_timeout");
   DBUG_PRINT("info",("spider this=%p", this));
-/*
-  ret = SQLSetConnectAttr(hdbc, SQL_ATTR_CONNECTION_TIMEOUT,
+  (void) SQLSetConnectAttr(hdbc, SQL_ATTR_CONNECTION_TIMEOUT,
     (SQLPOINTER) (SQLULEN) tot, SQL_IS_UINTEGER);
-  if (ret != SQL_SUCCESS)
-  {
-    DBUG_RETURN(spider_db_odbc_get_error(ret, SQL_HANDLE_DBC,
-      hdbc, conn, stored_error_msg));
-  }
-*/
   DBUG_RETURN(0);
 }
 
