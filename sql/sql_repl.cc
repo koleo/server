@@ -3969,7 +3969,11 @@ int reset_master(THD* thd, rpl_gtid *init_state, uint32 init_state_len,
   return ret;
 }
 
-
+static my_bool  find_share (TDC_element *el, MYSQL_BIN_LOG **out) {
+  if (el->share && el->share->online_alter_binlog)
+    *out= el->share->online_alter_binlog;
+  return FALSE;
+};
 /**
   Execute a SHOW BINLOG EVENTS statement.
 
@@ -4011,7 +4015,11 @@ bool mysql_show_binlog_events(THD* thd)
   /* select which binary log to use: binlog or relay */
   if ( thd->lex->sql_command == SQLCOM_SHOW_BINLOG_EVENTS )
   {
-    binary_log= &mysql_bin_log;
+    MYSQL_BIN_LOG *online_binlog = NULL;
+
+    tdc_iterate(thd, (my_hash_walk_action) find_share, &online_binlog, true);
+
+    binary_log= online_binlog ? online_binlog : &mysql_bin_log;
   }
   else  /* showing relay log contents */
   {

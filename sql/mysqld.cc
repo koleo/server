@@ -6297,7 +6297,7 @@ struct my_option my_long_options[]=
   {"debug-assert-on-not-freed-memory", 0,
    "Assert if we found problems with memory allocation",
    &debug_assert_on_not_freed_memory,
-   &debug_assert_on_not_freed_memory, 0, GET_BOOL, NO_ARG, 1, 0, 0, 0, 0,
+   &debug_assert_on_not_freed_memory, 0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0,
    0},
 #endif /* DBUG_OFF */
   /* default-storage-engine should have "MyISAM" as def_value. Instead

@@ -591,7 +591,6 @@ class MYSQL_BIN_LOG: public TC_LOG, private MYSQL_LOG
     new_file() is locking. new_file_without_locking() does not acquire
     LOCK_log.
   */
-  int new_file_without_locking();
   int new_file_impl();
   void do_checkpoint_request(ulong binlog_id);
   void purge();
@@ -601,6 +600,7 @@ class MYSQL_BIN_LOG: public TC_LOG, private MYSQL_LOG
   void trx_group_commit_leader(group_commit_entry *leader);
   bool is_xidlist_idle_nolock();
 public:
+  int new_file_without_locking();
   /*
     A list of struct xid_count_per_binlog is used to keep track of how many
     XIDs are in prepared, but not committed, state in each binlog. And how
@@ -1194,6 +1194,7 @@ int binlog_flush_pending_rows_event(THD *thd, bool stmt_end,
                                     binlog_cache_data *cache_data);
 Rows_log_event* binlog_get_pending_rows_event(binlog_cache_mngr *cache_mngr,
                                               bool use_trans_cache);
+binlog_cache_mngr *online_alter_binlog_get_cache_mngr(THD *thd, TABLE *table);
 binlog_cache_data* binlog_get_cache_data(binlog_cache_mngr *cache_mngr,
                                          bool use_trans_cache);
 

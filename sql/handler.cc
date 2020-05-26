@@ -6657,19 +6657,27 @@ static int binlog_log_row_online_alter(TABLE* table,
                                        Log_func *log_func,
                                        bool has_trans)
 {
-  if (!table->s->online_ater_binlog)
+  if (!table->s->online_alter_binlog)
     return 0;
 
   THD *thd= table->in_use;
 
   if (!table->online_alter_cache)
-    table->online_alter_cache= thd->binlog_setup_cache_data(&table->mem_root);
+  {
+    auto *cache_mngr= online_alter_binlog_get_cache_mngr(thd, table);
+    // Use transaction cache directly, if it is not multi-transaction mode
+    table->online_alter_cache= binlog_get_cache_data(cache_mngr, !thd->in_multi_stmt_transaction_mode());
+
+    trans_register_ha(thd, false, binlog_hton, 0);
+    if (thd->in_multi_stmt_transaction_mode())
+      trans_register_ha(thd, true, binlog_hton, 0);
+  }
 
   // We need to log all columns for the case if alter table changes primary key.
   table->use_all_columns();
   bitmap_set_all(table->rpl_write_set);
 
-  int error= (*log_func)(thd, table, table->s->online_ater_binlog,
+  int error= (*log_func)(thd, table, table->s->online_alter_binlog,
                          table->online_alter_cache, has_trans,
                          before_record, after_record);
   if (unlikely(error))
@@ -6682,7 +6690,7 @@ static int binlog_log_row_online_alter(TABLE* table,
                                          */
                                          false,
                                          true,
-                                         table->s->online_ater_binlog,
+                                         table->s->online_alter_binlog,
                                          table->online_alter_cache);
   return unlikely(error) ? HA_ERR_RBR_LOGGING_FAILED : 0;
 }
@@ -6732,7 +6740,7 @@ int handler::binlog_log_row(TABLE *table,
   int error = 0;
   if (table->file->check_table_binlog_row_based())
     error= binlog_log_row_to_binlog(table, before_record, after_record,
-                                    log_func);
+                                    log_func, row_logging_has_trans);
   if (!error)
     error= binlog_log_row_online_alter(table, before_record, after_record,
                                        log_func, row_logging_has_trans);

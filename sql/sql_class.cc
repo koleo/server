@@ -6782,10 +6782,10 @@ int THD::binlog_update_row(TABLE* table,  MYSQL_BIN_LOG *bin_log,
   auto creator= binlog_should_compress(before_size + after_size) ?
                 Rows_event_factory::get<Update_rows_compressed_log_event>() :
                 Rows_event_factory::get<Update_rows_log_event>();
-  auto *ev= mysql_bin_log.prepare_pending_rows_event(this, table, cache_data,
-                                                     variables.server_id,
-                                                     before_size + after_size,
-                                                     is_trans, creator);
+  auto *ev= bin_log->prepare_pending_rows_event(this, table, cache_data,
+                                                variables.server_id,
+                                                before_size + after_size,
+                                                is_trans, creator);
 
   if (unlikely(ev == 0))
     return HA_ERR_OUT_OF_MEM;
