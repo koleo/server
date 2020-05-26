@@ -6301,13 +6301,23 @@ static int binlog_log_row_online_alter(TABLE* table,
                                        const uchar *after_record,
                                        Log_func *log_func)
 {
-  if (!table->s->online_ater_binlog)
+  if (!table->s->online_alter_binlog)
     return 0;
   
   THD *thd= table->in_use;
   
   if (!table->online_alter_cache)
-    table->online_alter_cache= thd->binlog_setup_cache_data(&table->mem_root);
+  {
+    table->online_alter_cache.push(thd->binlog_setup_cache_data());
+
+    if (thd->in_multi_stmt_transaction_mode())
+    {
+      if (table->online_alter_cache.size() != 2)
+        table->online_alter_cache.push(thd->binlog_setup_cache_data());
+      trans_register_ha(thd, true, binlog_hton);
+    }
+    trans_register_ha(thd, false, binlog_hton);
+  }
 
   // We need to log all columns for the case if alter table changes primary key.
   table->use_all_columns();
@@ -6318,8 +6328,8 @@ static int binlog_log_row_online_alter(TABLE* table,
   bool has_trans= table->file->has_transactions() ||
                   thd->variables.option_bits & OPTION_GTID_BEGIN;
   
-  int error= (*log_func)(thd, table, table->s->online_ater_binlog,
-                         table->online_alter_cache, has_trans,
+  int error= (*log_func)(thd, table, table->s->online_alter_binlog,
+                         table->online_alter_cache.top(), has_trans,
                          before_record, after_record);
   if (unlikely(error))
     return HA_ERR_RBR_LOGGING_FAILED;
@@ -6331,8 +6341,8 @@ static int binlog_log_row_online_alter(TABLE* table,
                                          */
                                          false,
                                          true,
-                                         table->s->online_ater_binlog,
-                                         table->online_alter_cache);
+                                         table->s->online_alter_binlog,
+                                         table->online_alter_cache.top());
   return unlikely(error) ? HA_ERR_RBR_LOGGING_FAILED : 0;
 }
 

@@ -16,6 +16,8 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1335  USA */
 
+#include <array>
+#include <stack>
 #include "sql_plist.h"
 #include "sql_list.h"                           /* Sql_alloc */
 #include "mdl.h"
@@ -805,7 +807,7 @@ struct TABLE_SHARE
   plugin_ref default_part_plugin;
 #endif
 
-  MYSQL_BIN_LOG *online_ater_binlog;
+  MYSQL_BIN_LOG *online_alter_binlog;
 
   /**
     System versioning support.
@@ -1435,7 +1437,7 @@ public:
   */
   Item *notnull_cond;
 
-  binlog_cache_data *online_alter_cache;
+  binlog_cache_mngr *online_alter_cache;
 
   inline void reset() { bzero((void*)this, sizeof(*this)); }
   void init(THD *thd, TABLE_LIST *tl);

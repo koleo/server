@@ -1995,6 +1995,15 @@ static bool trans_cannot_safely_rollback(THD *thd, bool all)
 }
 
 
+static void binlog_online_alter_cleanup(binlog_cache_data **cache_data)
+{
+  (*cache_data)->reset();
+  delete *cache_data;
+  *cache_data= NULL;
+}
+
+static int cache_copy(IO_CACHE *to, IO_CACHE *from);
+
 /**
   This function is called once after each statement.
 
@@ -2013,30 +2022,43 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
   PSI_stage_info org_stage;
   DBUG_ENTER("binlog_commit");
 
-
   bool is_ending_transaction= ending_trans(thd, all);
 
   for (TABLE *table= thd->open_tables; table; table= table->next)
   {
-    if (!table->online_alter_cache)
+    if (table->online_alter_cache.empty())
       continue;
-    auto *binlog= table->s->online_ater_binlog;
-    DBUG_ASSERT(binlog);
 
+    auto *cache= table->online_alter_cache.top();
 
-    mysql_mutex_lock(binlog->get_log_lock());
-    error= binlog->write_cache(thd, &table->online_alter_cache->cache_log);
-    if (!error)
-      error= binlog->flush_and_sync(NULL);
-    mysql_mutex_unlock(binlog->get_log_lock());
+    if (is_ending_transaction)
+    {
+      auto *binlog= table->s->online_alter_binlog;
+      DBUG_ASSERT(binlog);
 
-    table->online_alter_cache->reset();
-    delete table->online_alter_cache;
-    table->online_alter_cache= NULL;
+      mysql_mutex_lock(binlog->get_log_lock());
+      error= binlog->write_cache(thd, &cache->cache_log);
+      if (!error)
+        error = binlog->flush_and_sync(NULL);
+      mysql_mutex_unlock(binlog->get_log_lock());
 
+      binlog_online_alter_cleanup(&table->online_alter_cache.top());
+      table->online_alter_cache.pop();
+    }
+    else
+    {
+      DBUG_ASSERT(table->online_alter_cache.size() == 2);
+      auto *from= table->online_alter_cache.top();
+      table->online_alter_cache.pop();
+      error= cache_copy(&table->online_alter_cache.top()->cache_log,
+                        &from->cache_log);
+
+      binlog_online_alter_cleanup(&from);
+    }
     if (error)
     {
-      my_error(ER_ERROR_ON_WRITE, MYF(ME_ERROR_LOG), binlog->get_name(), errno);
+      my_error(ER_ERROR_ON_WRITE, MYF(ME_ERROR_LOG),
+               table->s->online_alter_binlog->get_name(), errno);
       DBUG_RETURN(error);
     }
   }
@@ -2111,11 +2133,11 @@ static int binlog_rollback(handlerton *hton, THD *thd, bool all)
 
   for (TABLE *table= thd->open_tables; table; table= table->next)
   {
-    if (!table->online_alter_cache)
-      continue;
-    table->online_alter_cache->reset();
-    delete table->online_alter_cache;
-    table->online_alter_cache= NULL;
+    if (!table->online_alter_cache.empty())
+    {
+      binlog_online_alter_cleanup(&table->online_alter_cache.top());
+      table->online_alter_cache.pop();
+    }
   }
 
   int error= 0;
@@ -5616,17 +5638,29 @@ bool stmt_has_updated_non_trans_table(const THD* thd)
   binlog_hton, which has internal linkage.
 */
 
-binlog_cache_data *THD::binlog_setup_cache_data(MEM_ROOT *mem_root) 
+binlog_cache_mngr *THD::binlog_setup_cache_data()
 {
-  auto *cache= new binlog_cache_data();
-  cache->set_binlog_cache_info(max_binlog_stmt_cache_size,
-                               &binlog_stmt_cache_use,
-                               &binlog_stmt_cache_disk_use);
-  if (!cache ||
-      open_cached_file(&cache->cache_log, mysql_tmpdir,
+  auto *cache_mngr= (binlog_cache_mngr*) my_malloc(sizeof(binlog_cache_mngr),
+                                                   MYF(MY_ZEROFILL));
+  if (!cache_mngr ||
+      open_cached_file(&cache_mngr->stmt_cache.cache_log, mysql_tmpdir,
+                       LOG_PREFIX, (size_t)binlog_stmt_cache_size, MYF(MY_WME)) ||
+      open_cached_file(&cache_mngr->trx_cache.cache_log, mysql_tmpdir,
                        LOG_PREFIX, (size_t)binlog_cache_size, MYF(MY_WME)))
+  {
+    my_free(cache_mngr);
     return NULL;
-  return cache;
+  }
+
+  cache_mngr= new (cache_mngr)
+          binlog_cache_mngr(max_binlog_stmt_cache_size,
+                            max_binlog_cache_size,
+                            &binlog_stmt_cache_use,
+                            &binlog_stmt_cache_disk_use,
+                            &binlog_cache_use,
+                            &binlog_cache_disk_use);
+
+  return cache_mngr;
 }
 
 binlog_cache_mngr *THD::binlog_setup_trx_data()
@@ -5635,28 +5669,13 @@ binlog_cache_mngr *THD::binlog_setup_trx_data()
   binlog_cache_mngr *cache_mngr=
     (binlog_cache_mngr*) thd_get_ha_data(this, binlog_hton);
 
-  if (cache_mngr)
-    DBUG_RETURN(cache_mngr);                             // Already set up
-
-  cache_mngr= (binlog_cache_mngr*) my_malloc(sizeof(binlog_cache_mngr), MYF(MY_ZEROFILL));
-  if (!cache_mngr ||
-      open_cached_file(&cache_mngr->stmt_cache.cache_log, mysql_tmpdir,
-                       LOG_PREFIX, (size_t)binlog_stmt_cache_size, MYF(MY_WME)) ||
-      open_cached_file(&cache_mngr->trx_cache.cache_log, mysql_tmpdir,
-                       LOG_PREFIX, (size_t)binlog_cache_size, MYF(MY_WME)))
+  if (!cache_mngr)
   {
-    my_free(cache_mngr);
-    DBUG_RETURN(0);                      // Didn't manage to set it up
+    cache_mngr= binlog_setup_cache_data();
+    thd_set_ha_data(this, binlog_hton, cache_mngr);
   }
-  thd_set_ha_data(this, binlog_hton, cache_mngr);
 
-  cache_mngr= new (cache_mngr)
-              binlog_cache_mngr(max_binlog_stmt_cache_size,
-                                max_binlog_cache_size,
-                                &binlog_stmt_cache_use,
-                                &binlog_stmt_cache_disk_use,
-                                &binlog_cache_use,
-                                &binlog_cache_disk_use);
+
   DBUG_RETURN(cache_mngr);
 }
 
@@ -7084,6 +7103,26 @@ private:
   THD *thd;
   bool first;
 };
+
+int cache_copy(IO_CACHE *to, IO_CACHE *from)
+{
+  DBUG_ENTER("cache_copy");
+  if (reinit_io_cache(from, READ_CACHE, 0, 0, 0))
+    DBUG_RETURN(ER_ERROR_ON_WRITE);
+  size_t bytes_in_cache= my_b_bytes_in_cache(from);
+
+  do
+  {
+    my_b_write(to, from->read_pos, bytes_in_cache);
+
+    from->read_pos += bytes_in_cache;
+    bytes_in_cache= my_b_fill(from);
+    if (from->error || to->error)
+      DBUG_RETURN(ER_ERROR_ON_WRITE);
+  } while (bytes_in_cache);
+
+  DBUG_RETURN(0);
+}
 
 /*
   Write the contents of a cache to the binary log.
