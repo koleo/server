@@ -45,6 +45,7 @@
 #include <m_ctype.h>				// For test_if_number
 
 #include <set_var.h> // for Sys_last_gtid_ptr
+#include <intrusive_list.h>
 
 #ifdef _WIN32
 #include "message.h"
@@ -509,15 +510,16 @@ void Log_event_writer::add_status(enum_logged_status status)
     cache_data->add_status(status);
 }
 
-class binlog_cache_mngr {
+class binlog_cache_mngr: public intrusive::list_node<> {
 public:
   binlog_cache_mngr(my_off_t param_max_binlog_stmt_cache_size,
                     my_off_t param_max_binlog_cache_size,
                     ulong *param_ptr_binlog_stmt_cache_use,
                     ulong *param_ptr_binlog_stmt_cache_disk_use,
                     ulong *param_ptr_binlog_cache_use,
-                    ulong *param_ptr_binlog_cache_disk_use)
-    : last_commit_pos_offset(0), using_xa(FALSE), xa_xid(0)
+                    ulong *param_ptr_binlog_cache_disk_use,
+                    TABLE_SHARE *share)
+    : last_commit_pos_offset(0), using_xa(FALSE), xa_xid(0), share(share)
   {
      stmt_cache.set_binlog_cache_info(param_max_binlog_stmt_cache_size,
                                       param_ptr_binlog_stmt_cache_use,
@@ -580,6 +582,7 @@ public:
   /* Set if we get an error during commit that must be returned from unlog(). */
   bool delayed_error;
 
+  TABLE_SHARE *share;
 private:
 
   binlog_cache_mngr& operator=(const binlog_cache_mngr& info);
@@ -1994,12 +1997,27 @@ static bool trans_cannot_safely_rollback(THD *thd, bool all)
            thd->wsrep_binlog_format() == BINLOG_FORMAT_MIXED));
 }
 
-
-static void binlog_online_alter_cleanup(binlog_cache_data **cache_data)
+static void
+binlog_online_alter_cleanup(intrusive::list<binlog_cache_mngr> &list,
+                            bool ending_trans)
 {
-  (*cache_data)->reset();
-  delete *cache_data;
-  *cache_data= NULL;
+  for (auto &cache: list)
+  {
+    cache.reset(true, ending_trans);
+  }
+  if (ending_trans)
+  {
+    auto it= list.begin();
+    while (it != list.end())
+    {
+      auto &cache= *it;
+      it++;
+      list.remove(cache);
+      cache.~binlog_cache_mngr();
+      my_free(&cache);
+    }
+    DBUG_ASSERT(list.empty());
+  }
 }
 
 static int cache_copy(IO_CACHE *to, IO_CACHE *from);
@@ -2024,43 +2042,41 @@ static int binlog_commit(handlerton *hton, THD *thd, bool all)
 
   bool is_ending_transaction= ending_trans(thd, all);
 
-  for (TABLE *table= thd->open_tables; table; table= table->next)
+  for (auto &cache_mngr: thd->online_alter_cache_list)
   {
-    if (table->online_alter_cache.empty())
-      continue;
-
-    auto *cache= table->online_alter_cache.top();
+    auto *binlog= cache_mngr.share->online_alter_binlog;
+    DBUG_ASSERT(binlog);
 
     if (is_ending_transaction)
     {
-      auto *binlog= table->s->online_alter_binlog;
-      DBUG_ASSERT(binlog);
-
       mysql_mutex_lock(binlog->get_log_lock());
-      error= binlog->write_cache(thd, &cache->cache_log);
+      error= binlog->write_cache(thd, &cache_mngr.trx_cache.cache_log);
       if (!error)
         error = binlog->flush_and_sync(NULL);
       mysql_mutex_unlock(binlog->get_log_lock());
-
-      binlog_online_alter_cleanup(&table->online_alter_cache.top());
-      table->online_alter_cache.pop();
     }
     else
     {
-      DBUG_ASSERT(table->online_alter_cache.size() == 2);
-      auto *from= table->online_alter_cache.top();
-      table->online_alter_cache.pop();
-      error= cache_copy(&table->online_alter_cache.top()->cache_log,
-                        &from->cache_log);
-
-      binlog_online_alter_cleanup(&from);
+      error= cache_copy(&cache_mngr.trx_cache.cache_log,
+                        &cache_mngr.stmt_cache.cache_log);
     }
+
     if (error)
     {
       my_error(ER_ERROR_ON_WRITE, MYF(ME_ERROR_LOG),
-               table->s->online_alter_binlog->get_name(), errno);
+               binlog->get_name(), errno);
+      binlog_online_alter_cleanup(thd->online_alter_cache_list,
+                                  is_ending_transaction);
       DBUG_RETURN(error);
     }
+  }
+
+  binlog_online_alter_cleanup(thd->online_alter_cache_list,
+                              is_ending_transaction);
+
+  for (TABLE *table= thd->open_tables; table; table= table->next)
+  {
+    table->online_alter_cache= NULL;
   }
 
   binlog_cache_mngr *const cache_mngr= thd->binlog_get_cache_mngr();
@@ -2131,14 +2147,18 @@ static int binlog_rollback(handlerton *hton, THD *thd, bool all)
 {
   DBUG_ENTER("binlog_rollback");
 
-  for (TABLE *table= thd->open_tables; table; table= table->next)
-  {
-    if (!table->online_alter_cache.empty())
-    {
-      binlog_online_alter_cleanup(&table->online_alter_cache.top());
-      table->online_alter_cache.pop();
-    }
-  }
+  bool is_ending_trans= ending_trans(thd, all);
+
+  /*
+    This is a crucial moment that we are running through
+    thd->online_alter_cache_list, and not through thd->open_tables to cleanup
+    stmt cache, though both have it. The reason is that the tables can be closed
+    to that moment in case of an error.
+    The same reason applies to the fact we don't store cache_mngr in the table
+    itself -- because it can happen to be not existing.
+    Still in case if tables are left opened
+   */
+  binlog_online_alter_cleanup(thd->online_alter_cache_list, is_ending_trans);
 
   int error= 0;
   binlog_cache_mngr *const cache_mngr= thd->binlog_get_cache_mngr();
@@ -5638,7 +5658,7 @@ bool stmt_has_updated_non_trans_table(const THD* thd)
   binlog_hton, which has internal linkage.
 */
 
-binlog_cache_mngr *THD::binlog_setup_cache_data()
+binlog_cache_mngr *binlog_setup_cache_mngr(TABLE_SHARE *share)
 {
   auto *cache_mngr= (binlog_cache_mngr*) my_malloc(sizeof(binlog_cache_mngr),
                                                    MYF(MY_ZEROFILL));
@@ -5658,7 +5678,8 @@ binlog_cache_mngr *THD::binlog_setup_cache_data()
                             &binlog_stmt_cache_use,
                             &binlog_stmt_cache_disk_use,
                             &binlog_cache_use,
-                            &binlog_cache_disk_use);
+                            &binlog_cache_disk_use,
+                            share);
 
   return cache_mngr;
 }
@@ -5671,7 +5692,7 @@ binlog_cache_mngr *THD::binlog_setup_trx_data()
 
   if (!cache_mngr)
   {
-    cache_mngr= binlog_setup_cache_data();
+    cache_mngr= binlog_setup_cache_mngr(NULL);
     thd_set_ha_data(this, binlog_hton, cache_mngr);
   }
 
@@ -5890,10 +5911,41 @@ int THD::binlog_write_table_map(TABLE *table, bool is_transactional,
   DBUG_RETURN(0);
 }
 
+
+static intrusive::list<binlog_cache_mngr>*
+binlog_get_cache_mngr_list(THD *thd)
+{
+  auto *list= (intrusive::list<binlog_cache_mngr>*)thd_get_ha_data(thd,
+                                                                   binlog_hton);
+  if (unlikely(!list))
+  {
+    list= new intrusive::list<binlog_cache_mngr>();
+    thd_set_ha_data(thd, binlog_hton, list);
+  }
+  return list;
+}
+
+binlog_cache_mngr *online_alter_binlog_get_cache_mngr(THD *thd, TABLE *table)
+{
+  intrusive::list<binlog_cache_mngr> &list= thd->online_alter_cache_list;
+
+  for (auto &cache: list)
+  {
+    if (cache.share == table->s)
+      return &cache;
+  }
+
+  auto *new_cache_mngr= binlog_setup_cache_mngr(table->s);
+  list.push_back(*new_cache_mngr);
+
+  return new_cache_mngr;
+}
+
 binlog_cache_mngr *THD::binlog_get_cache_mngr() const
 {
   return (binlog_cache_mngr*) thd_get_ha_data(this, binlog_hton);
 }
+
 
 /**
   This function retrieves a pending row event from a cache which is

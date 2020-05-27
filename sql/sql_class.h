@@ -68,6 +68,7 @@ void set_thd_stage_info(void *thd,
 #include "wsrep_mysqld.h"
 #ifdef WITH_WSREP
 #include <inttypes.h>
+#include <intrusive_list.h>
 /* wsrep-lib */
 #include "wsrep_client_service.h"
 #include "wsrep_client_state.h"
@@ -2496,7 +2497,6 @@ public:
 
 #ifndef MYSQL_CLIENT
   binlog_cache_mngr *  binlog_setup_trx_data();
-  binlog_cache_mngr *  binlog_setup_cache_data();
 
   /*
     Public interface to write RBR events to the binlog
@@ -5041,6 +5041,8 @@ public:
   Item *sp_fix_func_item(Item **it_addr);
   Item *sp_prepare_func_item(Item **it_addr, uint cols= 1);
   bool sp_eval_expr(Field *result_field, Item **expr_item_ptr);
+
+  intrusive::list<binlog_cache_mngr> online_alter_cache_list;
 };
 
 /** A short cut for thd->get_stmt_da()->set_ok_status(). */

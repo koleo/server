@@ -6308,15 +6308,13 @@ static int binlog_log_row_online_alter(TABLE* table,
   
   if (!table->online_alter_cache)
   {
-    table->online_alter_cache.push(thd->binlog_setup_cache_data());
+    auto *cache_mngr= online_alter_binlog_get_cache_mngr(thd, table);
+    // Use transaction cache directly, if it is not multi-transaction mode
+    table->online_alter_cache= binlog_get_cache_data(cache_mngr, !thd->in_multi_stmt_transaction_mode());
 
-    if (thd->in_multi_stmt_transaction_mode())
-    {
-      if (table->online_alter_cache.size() != 2)
-        table->online_alter_cache.push(thd->binlog_setup_cache_data());
-      trans_register_ha(thd, true, binlog_hton);
-    }
     trans_register_ha(thd, false, binlog_hton);
+    if (thd->in_multi_stmt_transaction_mode())
+      trans_register_ha(thd, true, binlog_hton);
   }
 
   // We need to log all columns for the case if alter table changes primary key.
@@ -6327,9 +6325,9 @@ static int binlog_log_row_online_alter(TABLE* table,
   // See flush_and_set_pending_rows_event and set_write_error of MYSQL_BIN_LOG.
   bool has_trans= table->file->has_transactions() ||
                   thd->variables.option_bits & OPTION_GTID_BEGIN;
-  
+
   int error= (*log_func)(thd, table, table->s->online_alter_binlog,
-                         table->online_alter_cache.top(), has_trans,
+                         table->online_alter_cache, has_trans,
                          before_record, after_record);
   if (unlikely(error))
     return HA_ERR_RBR_LOGGING_FAILED;
@@ -6342,7 +6340,7 @@ static int binlog_log_row_online_alter(TABLE* table,
                                          false,
                                          true,
                                          table->s->online_alter_binlog,
-                                         table->online_alter_cache.top());
+                                         table->online_alter_cache);
   return unlikely(error) ? HA_ERR_RBR_LOGGING_FAILED : 0;
 }
 
