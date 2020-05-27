@@ -172,7 +172,9 @@ if ($HAVE_PARTITION)
 DROP DATABASE IF EXISTS auto_test_local;
 if ($USE_CHILD_GROUP2)
 {
+  eval $CHILD2_1_DROP_TABLES2;
   eval $CHILD2_1_DROP_DATABASE;
+  eval $CHILD2_2_DROP_TABLES;
   eval $CHILD2_2_DROP_DATABASE;
 }
 --disable_query_log

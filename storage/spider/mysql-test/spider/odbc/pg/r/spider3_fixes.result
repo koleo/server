@@ -185,6 +185,9 @@ MAX(id)
 deinit
 connection master_1;
 DROP DATABASE IF EXISTS auto_test_local;
+SELECT spider_direct_sql('DROP TABLE IF EXISTS "t1_1"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
+spider_direct_sql('DROP TABLE IF EXISTS "t1_1"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
+1
 SELECT 1;
 1
 1

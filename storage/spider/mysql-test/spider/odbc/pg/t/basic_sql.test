@@ -1229,6 +1229,8 @@ SELECT a, b, date_format(c, '%Y-%m-%d %H:%i:%s') FROM ta_l ORDER BY a;
 DROP DATABASE IF EXISTS auto_test_local;
 if ($USE_CHILD_GROUP2)
 {
+  eval $CHILD2_1_DROP_TABLES;
+  eval $CHILD2_1_DROP_TABLES3;
   eval $CHILD2_1_DROP_DATABASE;
   eval $CHILD2_2_DROP_DATABASE;
 }

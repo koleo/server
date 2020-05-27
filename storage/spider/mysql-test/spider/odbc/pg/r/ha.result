@@ -233,9 +233,21 @@ spider_flush_table_mon_cache()
 deinit
 connection master_1;
 DROP DATABASE IF EXISTS auto_test_local;
+SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
+spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
+1
+SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
+spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
+NULL
 SELECT 1;
 1
 1
+SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"');
+spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"')
+1
+SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"');
+spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"')
+NULL
 SELECT 1;
 1
 1
