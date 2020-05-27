@@ -72,20 +72,6 @@ Variable_name	Value
 Spider_direct_aggregate	10
 
 deinit
-connection master_1;
-DROP DATABASE IF EXISTS auto_test_local;
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r2"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r2"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
-1
-SELECT 1;
-1
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"')
-1
-SELECT 1;
-1
-1
 for child3
 for child2
 child2_3

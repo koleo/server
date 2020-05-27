@@ -93,7 +93,6 @@ Spider_mon_table_cache_version	0
 Spider_mon_table_cache_version_req	1
 INSERT INTO ta_l (a, b, c) VALUES
 (6, 'e', '2011-05-05 20:04:05');
-ERROR HY000: Table '(null).ta_r3' get a problem
 DELETE FROM ta_l WHERE a = 6;
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables
 ORDER BY db_name, table_name, link_id;
@@ -190,7 +189,6 @@ Spider_mon_table_cache_version	1
 Spider_mon_table_cache_version_req	2
 INSERT INTO ta_l (a, b, c) VALUES
 (6, 'e', '2011-05-05 20:04:05');
-ERROR HY000: Table '(null).ta_r' get a problem
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables
 ORDER BY db_name, table_name, link_id;
 db_name	table_name	link_id	link_status
@@ -231,35 +229,6 @@ spider_flush_table_mon_cache()
 1
 
 deinit
-connection master_1;
-DROP DATABASE IF EXISTS auto_test_local;
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
-NULL
-SELECT 1;
-1
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"')
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"')
-NULL
-SELECT 1;
-1
-1
-SELECT 1;
-1
-1
-connection child3_1;
-DROP DATABASE IF EXISTS auto_test_local;
-connection child3_2;
-DROP DATABASE IF EXISTS auto_test_local;
-connection child3_3;
-DROP DATABASE IF EXISTS auto_test_local;
 for master_1
 for child2
 child2_1

@@ -128,6 +128,8 @@ if ($USE_CHILD_GROUP2)
 --echo
 --echo deinit
 --disable_warnings
+--disable_query_log
+--disable_result_log
 --connection master_1
 DROP DATABASE IF EXISTS auto_test_local;
 if ($USE_CHILD_GROUP2)
@@ -136,8 +138,6 @@ if ($USE_CHILD_GROUP2)
   eval $CHILD2_1_DROP_DATABASE;
   eval $CHILD2_2_DROP_DATABASE;
 }
---disable_query_log
---disable_result_log
 --source test_deinit.inc
 --enable_result_log
 --enable_query_log

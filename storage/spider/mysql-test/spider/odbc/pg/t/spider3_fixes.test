@@ -106,6 +106,7 @@ if ($USE_REPLICATION)
 DROP TABLE IF EXISTS t1, t2;
 --enable_warnings
 --disable_query_log
+--disable_result_log
 echo CREATE TABLE t1 (
   id int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (id)
@@ -151,6 +152,7 @@ if ($USE_REPLICATION)
   ) $SLAVE1_1_ENGINE $SLAVE1_1_CHARSET $SLAVE1_1_COMMENT_INCREMENT1_1;
   --connection master_1
 }
+--enable_result_log
 --enable_query_log
 INSERT INTO t1 () VALUES ();
 SELECT LAST_INSERT_ID();
@@ -159,29 +161,37 @@ INSERT INTO t2 () VALUES ();
 SELECT LAST_INSERT_ID();
 SELECT MAX(id) FROM t2;
 --disable_query_log
+--disable_result_log
 echo MASTER_1_AUTO_INCREMENT_OFFSET3;
 eval $MASTER_1_AUTO_INCREMENT_OFFSET3;
+--enable_result_log
 --enable_query_log
 INSERT INTO t1 (id) VALUES (null);
 SELECT LAST_INSERT_ID();
 SELECT MAX(id) FROM t1;
 --disable_query_log
+--disable_result_log
 echo MASTER_1_AUTO_INCREMENT_OFFSET4;
 eval $MASTER_1_AUTO_INCREMENT_OFFSET4;
+--enable_result_log
 --enable_query_log
 INSERT INTO t2 (id) VALUES (null);
 SELECT LAST_INSERT_ID();
 SELECT MAX(id) FROM t2;
 --disable_query_log
+--disable_result_log
 echo MASTER_1_AUTO_INCREMENT_OFFSET3;
 eval $MASTER_1_AUTO_INCREMENT_OFFSET3;
+--enable_result_log
 --enable_query_log
 INSERT INTO t1 () VALUES (),(),(),();
 SELECT LAST_INSERT_ID();
 SELECT id FROM t1 ORDER BY id;
 --disable_query_log
+--disable_result_log
 echo MASTER_1_AUTO_INCREMENT_OFFSET4;
 eval $MASTER_1_AUTO_INCREMENT_OFFSET4;
+--enable_result_log
 --enable_query_log
 INSERT INTO t2 () VALUES (),(),(),();
 SELECT LAST_INSERT_ID();
@@ -196,15 +206,19 @@ SELECT LAST_INSERT_ID();
 SELECT id FROM t2 ORDER BY id;
 SET INSERT_ID=5000;
 --disable_query_log
+--disable_result_log
 echo MASTER_1_AUTO_INCREMENT_OFFSET3;
 eval $MASTER_1_AUTO_INCREMENT_OFFSET3;
+--enable_result_log
 --enable_query_log
 INSERT INTO t1 () VALUES ();
 SELECT LAST_INSERT_ID();
 SELECT MAX(id) FROM t1;
 --disable_query_log
+--disable_result_log
 echo MASTER_1_AUTO_INCREMENT_OFFSET4;
 eval $MASTER_1_AUTO_INCREMENT_OFFSET4;
+--enable_result_log
 --enable_query_log
 INSERT INTO t2 () VALUES ();
 SELECT LAST_INSERT_ID();
@@ -257,6 +271,8 @@ if ($USE_CHILD_GROUP2)
 --echo
 --echo deinit
 --disable_warnings
+--disable_query_log
+--disable_result_log
 --connection master_1
 DROP DATABASE IF EXISTS auto_test_local;
 if ($USE_REPLICATION)
@@ -270,8 +286,6 @@ if ($USE_CHILD_GROUP2)
   eval $CHILD2_1_DROP_DATABASE;
   eval $CHILD2_2_DROP_DATABASE;
 }
---disable_query_log
---disable_result_log
 --source slave_test_deinit.inc
 --source test_deinit.inc
 --enable_result_log

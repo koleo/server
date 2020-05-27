@@ -40,7 +40,7 @@ if ($VERSION_COMPILE_OS_WIN)
       c DATETIME DEFAULT '1999-10-10 10:10:10',
       PRIMARY KEY(a)
     ) $CHILD3_1_ENGINE $CHILD3_1_CHARSET
-    COMMENT='table "ta_r ta_r3"'
+    COMMENT='table "$S_2_1_TA_R $S_2_2_TA_R3"'
     CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2", wrapper "odbc",
     dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2"';
   let $CHILD3_1_CREATE_TABLES_HA_AS_2_1=
@@ -50,7 +50,7 @@ if ($VERSION_COMPILE_OS_WIN)
       c DATETIME DEFAULT '1999-10-10 10:10:10',
       PRIMARY KEY(a)
     ) $CHILD3_1_ENGINE $CHILD3_1_CHARSET
-    COMMENT='table "ta_r ta_r3"'
+    COMMENT='table "$S_2_1_TA_R $S_2_2_TA_R3"'
     CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2", alc "1", wrapper "odbc",
     dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2"';
 }
@@ -63,7 +63,7 @@ if (!$VERSION_COMPILE_OS_WIN)
       c DATETIME DEFAULT '1999-10-10 10:10:10',
       PRIMARY KEY(a)
     ) $CHILD3_1_ENGINE $CHILD3_1_CHARSET
-    COMMENT='table "ta_r ta_r3"'
+    COMMENT='table "$S_2_1_TA_R $S_2_2_TA_R3"'
     CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2", wrapper "odbc",
     dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2"';
   let $CHILD3_1_CREATE_TABLES_HA_AS_2_1=
@@ -73,7 +73,7 @@ if (!$VERSION_COMPILE_OS_WIN)
       c DATETIME DEFAULT '1999-10-10 10:10:10',
       PRIMARY KEY(a)
     ) $CHILD3_1_ENGINE $CHILD3_1_CHARSET
-    COMMENT='table "ta_r ta_r3"'
+    COMMENT='table "$S_2_1_TA_R $S_2_2_TA_R3"'
     CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2", alc "1", wrapper "odbc",
     dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2"';
 }
@@ -88,9 +88,9 @@ let $CHILD3_1_CREATE_TABLES_HA_P_2_1=
   ) $CHILD3_1_ENGINE $CHILD3_1_CHARSET
   COMMENT='msi "$CHILD3_1_SERVER_ID", mkd "2", wrapper "odbc"'
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "$S_2_1_TA_R $S_2_2_TA_R3",
     priority "1000"',
-    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "$S_2_1_TA_R2 $S_2_3_TA_R4",
     priority "1000001"'
   );
 let $CHILD3_1_CREATE_TABLES_HA_AS_P_2_1=
@@ -102,32 +102,32 @@ let $CHILD3_1_CREATE_TABLES_HA_AS_P_2_1=
   ) $CHILD3_1_ENGINE $CHILD3_1_CHARSET
   COMMENT='msi "$CHILD3_1_SERVER_ID", mkd "2", alc "1", wrapper "odbc"'
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "$S_2_1_TA_R $S_2_2_TA_R3",
     priority "1000"',
-    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "$S_2_1_TA_R2 $S_2_3_TA_R4",
     priority "1000001"'
   );
 let $CHILD3_1_SET_RECOVERY_STATUS_P_2_1=
   ALTER TABLE ta_l2
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "$S_2_1_TA_R $S_2_2_TA_R3",
     priority "1000"',
-    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "$S_2_1_TA_R2 $S_2_3_TA_R4",
     priority "1000001", lst "0 2"'
   );
 let $CHILD3_1_SET_OK_STATUS_P_2_1=
   ALTER TABLE ta_l2
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "$S_2_1_TA_R $S_2_2_TA_R3",
     priority "1000"',
-    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "$S_2_1_TA_R2 $S_2_3_TA_R4",
     priority "1000001", lst "0 1"'
   );
 let $CHILD3_1_SET_OK_STATUS_AS_P_2_1=
   ALTER TABLE ta_l2
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA2", tbl "$S_2_1_TA_R $S_2_2_TA_R3",
     priority "1000"',
-    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='dsn "$ODBC_DSN_HA1 $ODBC_DSN_HA3", tbl "$S_2_1_TA_R2 $S_2_3_TA_R4",
     priority "1000001", lst "1 0"'
   );

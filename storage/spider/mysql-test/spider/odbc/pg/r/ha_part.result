@@ -93,7 +93,6 @@ Spider_mon_table_cache_version	0
 Spider_mon_table_cache_version_req	1
 INSERT INTO ta_l2 (a, b, c) VALUES
 (6, 'e', '2011-05-05 20:04:05');
-ERROR HY000: Table '(null).ta_r4' get a problem
 DELETE FROM ta_l2 WHERE a = 6;
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables
 ORDER BY db_name, table_name, link_id;
@@ -122,13 +121,7 @@ a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
 
 recovery test
 connection master_1;
-ALTER TABLE ta_l2
-PARTITION BY KEY(a) (
-PARTITION pt1 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote2", tbl "ta_r ta_r3",
-    priority "1000"',
-PARTITION pt2 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote3", tbl "ta_r2 ta_r4",
-    priority "1000001", lst "0 2"'
-  );
+MASTER_1_SET_RECOVERY_STATUS_P_2_1
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables
 ORDER BY db_name, table_name, link_id;
 db_name	table_name	link_id	link_status
@@ -140,13 +133,7 @@ SELECT spider_copy_tables('ta_l2#P#pt2', '0', '1');
 spider_copy_tables('ta_l2#P#pt2', '0', '1')
 1
 connection master_1;
-ALTER TABLE ta_l2
-PARTITION BY KEY(a) (
-PARTITION pt1 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote2", tbl "ta_r ta_r3",
-    priority "1000"',
-PARTITION pt2 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote3", tbl "ta_r2 ta_r4",
-    priority "1000001", lst "0 1"'
-  );
+MASTER_1_SET_OK_STATUS_P_2_1
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables
 ORDER BY db_name, table_name, link_id;
 db_name	table_name	link_id	link_status
@@ -203,7 +190,6 @@ Spider_mon_table_cache_version	1
 Spider_mon_table_cache_version_req	1
 INSERT INTO ta_l2 (a, b, c) VALUES
 (6, 'e', '2011-05-05 20:04:05');
-ERROR HY000: Table '(null).ta_r2' get a problem
 DELETE FROM ta_l2 WHERE a = 6;
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables
 ORDER BY db_name, table_name, link_id;
@@ -231,13 +217,7 @@ a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
 
 recovery test
 connection master_1;
-ALTER TABLE ta_l2
-PARTITION BY KEY(a) (
-PARTITION pt1 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote2", tbl "ta_r ta_r3",
-    priority "1000"',
-PARTITION pt2 COMMENT='dsn "postgres_auto_test_remote postgres_auto_test_remote3", tbl "ta_r2 ta_r4",
-    priority "1000001", lst "1 0"'
-  );
+MASTER_1_SET_OK_STATUS_AS_P_2_1
 SELECT db_name, table_name, link_id, link_status FROM mysql.spider_tables
 ORDER BY db_name, table_name, link_id;
 db_name	table_name	link_id	link_status
@@ -258,41 +238,6 @@ a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
 DROP TABLE ta_l2;
 
 deinit
-connection master_1;
-DROP DATABASE IF EXISTS auto_test_local;
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r2"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r2"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r2"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r2"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
-NULL
-SELECT 1;
-1
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"')
-1
-SELECT 1;
-1
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r4"', '', 'dsn "postgres_auto_test_remote3", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r4"', '', 'dsn "postgres_auto_test_remote3", wrapper "odbc"')
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r4"', '', 'dsn "postgres_auto_test_remote3", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r4"', '', 'dsn "postgres_auto_test_remote3", wrapper "odbc"')
-NULL
-SELECT 1;
-1
-1
-connection child3_1;
-DROP DATABASE IF EXISTS auto_test_local;
-connection child3_2;
-DROP DATABASE IF EXISTS auto_test_local;
-connection child3_3;
-DROP DATABASE IF EXISTS auto_test_local;
 for master_1
 for child2
 child2_1

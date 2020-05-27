@@ -229,9 +229,11 @@ if ($USE_CHILD_GROUP2)
 }
 --connection master_1
 eval $MASTER_1_CHECK_HA_STATUS;
+--disable_result_log
 --error 12511
 INSERT INTO ta_l (a, b, c) VALUES
   (6, 'e', '2011-05-05 20:04:05');
+--enable_result_log
 DELETE FROM ta_l WHERE a = 6;
 eval $MASTER_1_CHECK_LINK_STATUS;
 eval $MASTER_1_CHECK_LINK_FAILED_LOG;
@@ -546,9 +548,11 @@ if ($USE_CHILD_GROUP2)
 }
 --connection master_1
 eval $MASTER_1_CHECK_HA_STATUS;
+--disable_result_log
 --error 12511
 INSERT INTO ta_l (a, b, c) VALUES
   (6, 'e', '2011-05-05 20:04:05');
+--enable_result_log
 eval $MASTER_1_CHECK_LINK_STATUS;
 eval $MASTER_1_CHECK_LINK_FAILED_LOG;
 eval $MASTER_1_CHECK_HA_STATUS;
@@ -693,6 +697,8 @@ eval $MASTER_1_CHANGE_HA_MON;
 --echo
 --echo deinit
 --disable_warnings
+--disable_query_log
+--disable_result_log
 --connection master_1
 DROP DATABASE IF EXISTS auto_test_local;
 if ($USE_CHILD_GROUP2)
@@ -714,8 +720,6 @@ if ($USE_CHILD_GROUP3)
   --connection child3_3
   DROP DATABASE IF EXISTS auto_test_local;
 }
---disable_query_log
---disable_result_log
 --source ha_test_deinit.inc
 --source test_deinit.inc
 --enable_result_log

@@ -1,4 +1,5 @@
 --source ../../../include/init_spider.inc
+SET GLOBAL spider_general_log= ON;
 let $VERSION_COMPILE_OS_WIN=
   `SELECT IF(@@version_compile_os like 'Win%', 1, 0)`;
 if ($VERSION_COMPILE_OS_WIN)

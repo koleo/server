@@ -123,20 +123,6 @@ a	b	date_format(c, '%Y-%m-%d %H:%i:%s')
 5	h	2001-10-31 00:00:00
 
 deinit
-connection master_1;
-DROP DATABASE IF EXISTS auto_test_local;
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r2"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r2"', '', 'dsn "postgres_auto_test_remote", wrapper "odbc"')
-1
-SELECT 1;
-1
-1
-SELECT spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"');
-spider_direct_sql('DROP TABLE IF EXISTS "ta_r3"', '', 'dsn "postgres_auto_test_remote2", wrapper "odbc"')
-1
-SELECT 1;
-1
-1
 for child3
 for child2
 child2_3
