@@ -717,9 +717,13 @@ if ($MASTER_1_ENGINE_IS_SPIDER)
     PRIMARY KEY (id)
   ) $MASTER_1_ENGINE $MASTER_1_CHARSET $MASTER_1_COMMENT_ERROR_MODE1_1;
   --enable_query_log
+  --replace_regex /ODBC . 42P01/ODBC X 42P01/
   SELECT id FROM t1 ORDER BY id;
+  --replace_regex /ODBC . 42P01/ODBC X 42P01/
   INSERT INTO t1 (id) VALUES (1);
+  --replace_regex /ODBC . 42P01/ODBC X 42P01/
   DELETE FROM t1;
+  --replace_regex /ODBC . 42P01/ODBC X 42P01/
   TRUNCATE t1;
 }
 if (!$MASTER_1_ENGINE_IS_SPIDER)

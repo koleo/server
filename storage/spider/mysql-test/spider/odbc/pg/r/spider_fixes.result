@@ -424,25 +424,25 @@ PRIMARY KEY (id)
 SELECT id FROM t1 ORDER BY id;
 id
 Warnings:
-Error	12712	Error from ODBC 7 42P01 ERROR: relation "ter1_1" does not exist;
+Error	12712	Error from ODBC X 42P01 ERROR: relation "ter1_1" does not exist;
 Error while executing the query
 Error	12712	ERROR: relation "ter1_1" does not exist;
 Error while executing the query
 INSERT INTO t1 (id) VALUES (1);
 Warnings:
-Error	12712	Error from ODBC 7 42P01 ERROR: relation "ter1_1" does not exist;
+Error	12712	Error from ODBC X 42P01 ERROR: relation "ter1_1" does not exist;
 Error while executing the query
 Error	12712	ERROR: relation "ter1_1" does not exist;
 Error while executing the query
 DELETE FROM t1;
 Warnings:
-Error	12712	Error from ODBC 7 42P01 ERROR: relation "ter1_1" does not exist;
+Error	12712	Error from ODBC X 42P01 ERROR: relation "ter1_1" does not exist;
 Error while executing the query
 Error	12712	ERROR: relation "ter1_1" does not exist;
 Error while executing the query
 TRUNCATE t1;
 Warnings:
-Error	12712	Error from ODBC 7 42P01 ERROR: relation "ter1_1" does not exist;
+Error	12712	Error from ODBC X 42P01 ERROR: relation "ter1_1" does not exist;
 Error while executing the query
 Error	12712	ERROR: relation "ter1_1" does not exist;
 Error while executing the query
