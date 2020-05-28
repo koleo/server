@@ -98,3 +98,5 @@ let $CHILD2_2_AUTO_INCREMENT_OFFSET2=
   SELECT spider_direct_sql('DROP SEQUENCE IF EXISTS "$S_2_2_T1_2_SEQ"', '', 'dsn "$ODBC_DSN_HA2", wrapper "odbc"')
   $STR_SEMICOLON
   SELECT spider_direct_sql('CREATE SEQUENCE "$S_2_2_T1_2_SEQ" START WITH 3 INCREMENT BY 4', '', 'dsn "$ODBC_DSN_HA2", wrapper "odbc"');
+let $CHILD2_2_AUTO_INCREMENT_DROP=
+  SELECT spider_direct_sql('DROP SEQUENCE IF EXISTS "$S_2_2_T1_2_SEQ"', '', 'dsn "$ODBC_DSN_HA2", wrapper "odbc"');

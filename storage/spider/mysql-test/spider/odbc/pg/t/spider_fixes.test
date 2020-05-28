@@ -852,6 +852,7 @@ if ($USE_CHILD_GROUP2)
 --disable_query_log
 --disable_result_log
 --connection master_1
+eval $MASTER_1_AUTO_INCREMENT_DROP;
 DROP DATABASE IF EXISTS auto_test_local;
 if ($USE_REPLICATION)
 {
@@ -864,7 +865,14 @@ if ($USE_CHILD_GROUP2)
   eval $CHILD2_1_DROP_TABLES4;
   eval $CHILD2_1_DROP_TABLES5;
   eval $CHILD2_1_DROP_TABLES6;
+  eval $CHILD2_1_DROP_LOCK_TABLES1;
+  eval $CHILD2_1_DROP_LOCK_TABLES2;
+  eval $CHILD2_1_DROP_TEXT_KEY_TABLES1;
+  eval $CHILD2_1_DROP_INCREMENT_TABLES1;
+  eval $CHILD2_1_AUTO_INCREMENT_DROP;
   eval $CHILD2_1_DROP_DATABASE;
+  eval $CHILD2_2_DROP_LOCK_TABLES1;
+  eval $CHILD2_2_DROP_LOCK_TABLES2;
   eval $CHILD2_2_DROP_DATABASE;
 }
 --source slave_test_deinit.inc
