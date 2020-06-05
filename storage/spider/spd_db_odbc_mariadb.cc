@@ -127,7 +127,10 @@ SPIDER_DBTON spider_dbton_odbc_mariadb = {
   NULL,
 #endif
   spider_odbc_support_direct_join,
-  &spider_db_odbc_mariadb_utility
+  &spider_db_odbc_mariadb_utility,
+  "For communicating MariaDB using ODBC protocol, mostly test purpose",
+  "1.0.0",
+  SPIDER_MATURITY_BETA
 };
 
 spider_db_odbc_mariadb_result::spider_db_odbc_mariadb_result(

@@ -413,7 +413,10 @@ SPIDER_DBTON spider_dbton_odbc = {
   NULL,
 #endif
   spider_odbc_support_direct_join,
-  &spider_db_odbc_utility
+  &spider_db_odbc_utility,
+  "For communicating using ODBC protocol",
+  "1.0.0",
+  SPIDER_MATURITY_BETA
 };
 
 int spider_db_odbc_get_error(
