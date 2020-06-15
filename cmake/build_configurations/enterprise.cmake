@@ -1,6 +1,6 @@
 # Copyright (c) 2010, 2011, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011, 2018, 2019, MariaDB Corporation
-# 
+#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; version 2 of the License.
@@ -12,13 +12,15 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1335  USA 
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1335  USA
 
 # This file includes build settings used for MySQL release
 
 INCLUDE(CheckIncludeFiles)
 INCLUDE(CheckLibraryExists)
 INCLUDE(CheckTypeSize)
+INCLUDE(misc)
+INCLUDE(mysql_version)
 
 # XXX package_name.cmake uses this too, move it somewhere global
 CHECK_TYPE_SIZE("void *" SIZEOF_VOIDP)
@@ -39,12 +41,15 @@ SET(CPACK_PACKAGE_DESCRIPTION "MariaDB Enterprise Server: a very fast and robust
   MariaDB documentation can be found at https://mariadb.com/kb/en/
   MariaDB bug reports should be submitted through https://support.mariadb.com/")
 
+# here we're going to unconditionally redefine default source package name
+# set in mysql_version.cmake:87
+SET(CPACK_SOURCE_PACKAGE_FILE_NAME "mariadb${MYSQL_SERVER_SUFFIX}-${VERSION}")
+
 IF(WIN32)
   SET(MSVC_CRT_TYPE /MT CACHE STRING   "Runtime library - specify runtime library for linking (/MT,/MTd,/MD,/MDd)")
 ENDIF()
 
 SET(PLUGIN_S3 STATIC CACHE STRING "")
-
 SET(PLUGIN_SPHINX NO CACHE STRING "")
 SET(PLUGIN_TOKUDB NO CACHE STRING "")
 
@@ -151,7 +156,7 @@ IF(UNIX)
 ENDIF()
 
 # Compiler options
-IF(UNIX)  
+IF(UNIX)
 
   # Default GCC flags
   IF(CMAKE_COMPILER_IS_GNUCC)
@@ -248,7 +253,7 @@ IF(UNIX)
           SET(CMAKE_C_FLAGS_RELWITHDEBINFO   "-xO3 ${COMMON_C_FLAGS}")
           SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-xO3 ${COMMON_CXX_FLAGS}")
         ENDIF()
-      ELSE() 
+      ELSE()
         # Assume !x86 is SPARC
         SET(COMMON_C_FLAGS                 "-g -Xa -xstrconst -mt")
         SET(COMMON_CXX_FLAGS               "-g0 -noex -mt")
