@@ -698,16 +698,28 @@ private:
 };
 #endif
 
+log_file_t::log_file_t(log_file_t &&rhs)
+  : m_file(std::move(rhs.m_file)), m_path(std::move(rhs.m_path))
+{
+}
+
+log_file_t& log_file_t::operator=(log_file_t &&rhs)
+{
+  m_file= std::move(rhs.m_file);
+  m_path= std::move(rhs.m_path);
+  return *this;
+}
+
 dberr_t log_file_t::open(bool read_only) noexcept
 {
   ut_a(!is_opened());
 
 #ifdef HAVE_PMEM
   auto ptr= is_pmem(m_path.c_str())
-                ? std::unique_ptr<file_io>(new file_pmem_io)
-                : std::unique_ptr<file_io>(new file_os_io);
+                ? std::make_shared<file_pmem_io>()
+                : std::make_shared<file_os_io>();
 #else
-  auto ptr= std::unique_ptr<file_io>(new file_os_io);
+  auto ptr= std::make_shared<file_os_io>();
 #endif
 
   if (dberr_t err= ptr->open(m_path.c_str(), read_only))
@@ -756,13 +768,36 @@ bool log_file_t::writes_are_durable() const noexcept
 dberr_t log_file_t::write(os_offset_t offset, span<const byte> buf) noexcept
 {
   ut_ad(is_opened());
-  return m_file->write(m_path.c_str(), offset, buf);
+  std::shared_ptr<file_io> file;
+  {
+    std::lock_guard<std::mutex> _(m_mutex);
+    file= m_file;
+  }
+  return file->write(m_path.c_str(), offset, buf);
 }
 
 dberr_t log_file_t::flush() noexcept
 {
   ut_ad(is_opened());
-  return m_file->flush();
+  std::shared_ptr<file_io> file;
+  {
+    std::lock_guard<std::mutex> _(m_mutex);
+    file= m_file;
+  }
+  return file->flush();
+}
+
+std::shared_ptr<file_io> log_file_t::get_internal_file()
+{
+  std::lock_guard<std::mutex> _(m_mutex);
+  return m_file;
+}
+
+void log_file_t::adopt_file(std::shared_ptr<file_io> file, std::string path)
+{
+  std::lock_guard<std::mutex> _(m_mutex);
+  m_file= file;
+  m_path= std::move(path);
 }
 
 void log_t::file::open_file(std::string path)
@@ -777,7 +812,8 @@ void log_t::file::adopt_future_file()
   ut_ad(log_mutex_own());
 
   log_sys.log.future_fd_exists = false;
-  fd= std::move(future_fd);
+  fd.adopt_file(future_fd.get_internal_file(), future_fd.get_path());
+  future_fd= {};
   file_size= future_file_size;
   srv_log_file_size= future_file_size;
   ut_ad(log_set_capacity(future_file_size, false));
@@ -1033,7 +1069,7 @@ static void future_log_write(span<byte> buf)
   log_sys.log.future_file_start_lsn= std::min(log_sys.log.future_file_start_lsn,
                                               aligned_lsn);
 
-  file_io &fd= log_sys.log.future_fd.get_internal_file();
+  std::shared_ptr<file_io> fd= log_sys.log.future_fd.get_internal_file();
   std::string path_str= log_sys.log.future_fd.get_path();
   const char *path= path_str.c_str();
   log_mutex_exit();
@@ -1044,7 +1080,7 @@ static void future_log_write(span<byte> buf)
     ut_ad(partial_size % OS_FILE_LOG_BLOCK_SIZE == 0);
 
     ut_ad(offset + partial_size <= file_size);
-    if (dberr_t err= fd.write(path, offset, {write_this, partial_size}))
+    if (dberr_t err= fd->write(path, offset, {write_this, partial_size}))
       ib::fatal() << "write() to a future log file failed with " << err;
 
     write_size-= partial_size;
@@ -1053,7 +1089,7 @@ static void future_log_write(span<byte> buf)
   }
 
   ut_ad(offset + write_size <= file_size);
-  if (dberr_t err= fd.write(path, offset, {write_this, write_size}))
+  if (dberr_t err= fd->write(path, offset, {write_this, write_size}))
     ib::fatal() << "write() to a future log file failed with " << err;
 }
 

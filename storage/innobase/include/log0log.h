@@ -471,6 +471,9 @@ class log_file_t
 public:
   log_file_t(std::string path= "") noexcept : m_path{std::move(path)} {}
 
+  log_file_t(log_file_t &&rhs);
+  log_file_t& operator=(log_file_t &&rhs);
+
   dberr_t open(bool read_only) noexcept;
   bool is_opened() const noexcept;
 
@@ -487,10 +490,12 @@ public:
     m_path.clear();
     m_path.shrink_to_fit();
   }
-  file_io &get_internal_file() { return *m_file.get(); }
+  std::shared_ptr<file_io> get_internal_file();
+  void adopt_file(std::shared_ptr<file_io> file, std::string path);
 
 private:
-  std::unique_ptr<file_io> m_file;
+  std::mutex m_mutex;
+  std::shared_ptr<file_io> m_file; // guarded by m_mutex
   std::string m_path;
 };
 
