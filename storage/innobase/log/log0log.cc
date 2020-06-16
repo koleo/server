@@ -816,6 +816,9 @@ void log_t::file::adopt_future_file()
   future_fd= {};
   file_size= future_file_size;
   srv_log_file_size= future_file_size;
+  ut_ad(lsn_offset % OS_FILE_LOG_BLOCK_SIZE ==
+        future_lsn_offset % OS_FILE_LOG_BLOCK_SIZE);
+  lsn_offset= future_lsn_offset;
   ut_ad(log_set_capacity(future_file_size, false));
 
   ib::info() << "innodb_log_file_size changed to " << file_size;
@@ -1384,6 +1387,11 @@ void log_write_checkpoint_info(lsn_t end_lsn)
 			      log_sys.next_checkpoint_no,
 			      log_sys.next_checkpoint_lsn));
 
+	const bool adopt_future_file
+		= log_sys.log.future_fd_exists.load(std::memory_order_relaxed)
+		  && log_sys.log.future_file_start_lsn
+			     <= log_sys.next_checkpoint_lsn;
+
 	byte* buf = log_sys.checkpoint_buf;
 	memset(buf, 0, OS_FILE_LOG_BLOCK_SIZE);
 
@@ -1394,8 +1402,12 @@ void log_write_checkpoint_info(lsn_t end_lsn)
 		log_crypt_write_checkpoint_buf(buf);
 	}
 
-	lsn_t lsn_offset
-		= log_sys.log.calc_lsn_offset(log_sys.next_checkpoint_lsn);
+	lsn_t lsn_offset = adopt_future_file
+				   ? log_sys.log.calc_lsn_offset_future(
+					   log_sys.next_checkpoint_lsn,
+					   log_sys.log.future_file_size)
+				   : log_sys.log.calc_lsn_offset(
+					   log_sys.next_checkpoint_lsn);
 	mach_write_to_8(buf + LOG_CHECKPOINT_OFFSET, lsn_offset);
 	mach_write_to_8(buf + LOG_CHECKPOINT_LOG_BUF_SIZE,
 			srv_log_buffer_size);
@@ -1421,8 +1433,7 @@ void log_write_checkpoint_info(lsn_t end_lsn)
 
 	log_mutex_enter();
 
-	if (log_sys.log.future_fd_exists &&
-	    log_sys.log.future_file_start_lsn <= log_sys.next_checkpoint_lsn) {
+	if (adopt_future_file) {
 		// At this point new file must contain all the data
 		// covered by current checkpoint
 
@@ -2179,6 +2190,11 @@ void file_changer_t::actual_resizer(void *)
     if (size < log_sys.log.file_size)
       ut_ad(log_set_capacity(size, true));
     log_sys.log.future_file_start_lsn= std::numeric_limits<lsn_t>::max();
+    log_mutex_enter();
+    log_sys.log.future_lsn_offset=
+        LOG_FILE_HDR_SIZE +
+        log_sys.log.get_lsn_offset() % OS_FILE_LOG_BLOCK_SIZE;
+    log_mutex_exit();
     log_sys.log.future_fd_exists= true;
   }
 

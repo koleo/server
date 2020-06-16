@@ -581,6 +581,8 @@ public:
     log_file_t future_fd;
     /** future file replicated log since that LSN */
     lsn_t future_file_start_lsn{std::numeric_limits<lsn_t>::max()};
+    /** same as lsn_offset but for the new file */
+    std::atomic<lsn_t> future_lsn_offset;
 
     /** used only in recovery: recovery scan succeeded up to this
     lsn in this log group */
@@ -630,6 +632,13 @@ public:
     /** Set the field values to correspond to a given lsn. */
     void set_fields(lsn_t lsn)
     {
+      if (future_fd_exists.load(std::memory_order_relaxed))
+      {
+        lsn_t c_future_lsn_offset= calc_lsn_offset_future(
+            lsn, future_file_size);
+        future_lsn_offset.store(c_future_lsn_offset,
+                                std::memory_order_relaxed);
+      }
       lsn_t c_lsn_offset = calc_lsn_offset(lsn);
       set_lsn(lsn);
       set_lsn_offset(c_lsn_offset);
@@ -849,6 +858,7 @@ inline lsn_t log_t::file::calc_lsn_offset_future(lsn_t lsn,
     l= size - l;
   }
 
+  const auto lsn_offset= future_lsn_offset.load(std::memory_order_relaxed);
   l+= lsn_offset - LOG_FILE_HDR_SIZE * (1 + lsn_offset / file_size);
   l%= size;
   return l + LOG_FILE_HDR_SIZE * (1 + l / (file_size - LOG_FILE_HDR_SIZE));
