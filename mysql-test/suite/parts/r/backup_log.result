@@ -67,8 +67,7 @@ ERROR 23000: Duplicate entry '1' for key 'PRIMARY'
 create table t32 (a int) PARTITION BY HASH(a) PARTITIONS 2;
 drop table if exists t30,t31,t32,tmp_t30;
 Warnings:
-Note	1051	Unknown table 'test.t31'
-Note	1051	Unknown table 'test.tmp_t30'
+Note	1051	Unknown table 'test.t31,test.tmp_t30'
 #
 # Testing create LIKE
 #
