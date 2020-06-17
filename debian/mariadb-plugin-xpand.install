@@ -1,2 +1,2 @@
-etc/mysql/conf.d/xpand.cnf etc/mysql/mariadb.conf.d
+etc/mysql/mariadb.conf.d/xpand.cnf
 usr/lib/mysql/plugin/ha_xpand.so
