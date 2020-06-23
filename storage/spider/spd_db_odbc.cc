@@ -1658,14 +1658,30 @@ int spider_db_odbc::exec_query(
           conn, stored_error_msg);
         DBUG_RETURN(stored_error);
       }
-      ret = SQLSetCursorName(hstm, (SQLCHAR *) "cur", SQL_NTS);
-      if (ret != SQL_SUCCESS)
+      switch (thd_sql_command(current_thd))
       {
-        stored_error = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT, hstm,
-          conn, stored_error_msg);
-        SQLFreeHandle(SQL_HANDLE_STMT, hstm);
-        hstm = NULL;
-        DBUG_RETURN(stored_error);
+#ifdef HS_HAS_SQLCOM
+      case SQLCOM_HS_UPDATE:
+#endif
+      case SQLCOM_UPDATE:
+      case SQLCOM_UPDATE_MULTI:
+      /* for triggers */
+      case SQLCOM_INSERT:
+      case SQLCOM_INSERT_SELECT:
+      case SQLCOM_DELETE:
+      case SQLCOM_DELETE_MULTI:
+        ret = SQLSetCursorName(hstm, (SQLCHAR *) "cur", SQL_NTS);
+        if (ret != SQL_SUCCESS)
+        {
+          stored_error = spider_db_odbc_get_error(ret, SQL_HANDLE_STMT, hstm,
+            conn, stored_error_msg);
+          SQLFreeHandle(SQL_HANDLE_STMT, hstm);
+          hstm = NULL;
+          DBUG_RETURN(stored_error);
+        }
+        break;
+      default:
+        break;
       }
     }
     ret = SQLExecDirect(hstm, (SQLCHAR *) query, (SQLINTEGER) length);
