@@ -874,7 +874,7 @@ public:
   Timeval(my_time_t sec, ulong usec)
   {
     tv_sec= sec;
-    tv_usec= usec;
+    tv_usec= (int)usec;
   }
   explicit Timeval(const timeval &tv)
    :timeval(tv)
