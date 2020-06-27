@@ -32,7 +32,7 @@ IF(SIZEOF_VOIDP EQUAL 8)
 ENDIF()
 
 # MENT-2 Binary information
-SET(COMPILATION_COMMENT "MariaDB Enterprise Server - Technical Preview")
+SET(COMPILATION_COMMENT "MariaDB Enterprise Server")
 SET(MYSQL_SERVER_SUFFIX "-enterprise")
 SET(CPACK_PACKAGE_URL "http://mariadb.com")
 SET(CPACK_PACKAGE_CONTACT "MariaDB Corporation <info@mariadb.com>")
