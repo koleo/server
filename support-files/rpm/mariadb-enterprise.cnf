@@ -13,8 +13,6 @@
 
 [mariadb]
 
-disable-s3
-
 ## -- Only enables stable plugins. Comment or change to unknown if you want
 #     to have all plugins enabled
 plugin-maturity=stable
