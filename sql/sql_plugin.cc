@@ -2256,7 +2256,8 @@ bool mysql_install_plugin(THD *thd, const LEX_CSTRING *name,
     This hack should be removed when LOCK_plugin is fixed so it
     protects only what it supposed to protect.
 
-    See also mysql_uninstall_plugin() and initialize_audit_plugin()
+    See also plugin_load(), mysql_uninstall_plugin() and
+      initialize_audit_plugin()
   */
   if (mysql_audit_general_enabled())
     mysql_audit_acquire_plugins(thd, event_class_mask);
@@ -2417,7 +2418,8 @@ bool mysql_uninstall_plugin(THD *thd, const LEX_CSTRING *name,
     This hack should be removed when LOCK_plugin is fixed so it
     protects only what it supposed to protect.
 
-    See also mysql_install_plugin() and initialize_audit_plugin()
+    See also plugin_load(), mysql_install_plugin() and
+      initialize_audit_plugin().
   */
   if (mysql_audit_general_enabled())
     mysql_audit_acquire_plugins(thd, event_class_mask);
