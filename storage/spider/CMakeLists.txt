@@ -61,7 +61,7 @@ ELSE()
   ENDIF()
 
   MYSQL_ADD_PLUGIN(spider ${SPIDER_SOURCES} ${extra_options}
-    STORAGE_ENGINE MODULE_ONLY)
+    STORAGE_ENGINE MODULE_ONLY COMPONENT spider-engine)
   IF(NOT TARGET spider)
     RETURN()
   ENDIF()
