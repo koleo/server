@@ -670,6 +670,15 @@ Description: CrackLib Password Validation Plugin for MariaDB
  .
  Install and configure this to enforce stronger passwords for MariaDB users.
 
+Package: mariadb-plugin-hashicorp-key-management
+Architecture: any
+Depends: mariadb-server-10.5 (= ${binary:Version}),
+         ${misc:Depends},
+         ${shlibs:Depends}
+Description: Hashicorp Key Management plugin for MariaDB
+ This encryption plugin uses Hashicorp Vault for storing encryption
+ keys for MariaDB Data-at-Rest encryption.
+
 Package: mariadb-plugin-xpand
 Architecture: any
 Depends: mariadb-server-10.5 (= ${binary:Version}),
