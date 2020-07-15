@@ -19173,7 +19173,7 @@ static void innodb_update_io_thread_count(THD *thd,ulint n_read, ulint n_write)
     ut_a(srv_use_native_aio);
     push_warning_printf(thd, Sql_condition::WARN_LEVEL_WARN,
       ER_UNKNOWN_ERROR,
-      "Could reserve max. number of concurrent ios."
+      "Could not reserve max. number of concurrent ios."
       "Increase the /proc/sys/fs/aio-max-nr to fix.");
 #endif
   }
@@ -19181,12 +19181,13 @@ static void innodb_update_io_thread_count(THD *thd,ulint n_read, ulint n_write)
 
 static void innodb_read_io_threads_update(THD* thd, struct st_mysql_sys_var*, void*, const void* save)
 {
-  innodb_update_io_thread_count(thd, *static_cast<const ulong*>(save), srv_n_write_io_threads);
+  srv_n_read_io_threads = *static_cast<const ulong*>(save);
+  innodb_update_io_thread_count(thd, srv_n_read_io_threads, srv_n_write_io_threads);
 }
-
 static void innodb_write_io_threads_update(THD* thd, struct st_mysql_sys_var*, void*, const void* save)
 {
-  innodb_update_io_thread_count(thd, srv_n_read_io_threads, *static_cast<const ulong*>(save));
+  srv_n_write_io_threads = *static_cast<const ulong*>(save);
+  innodb_update_io_thread_count(thd, srv_n_read_io_threads, srv_n_write_io_threads);
 }
 
 static MYSQL_SYSVAR_ULONG(read_io_threads, srv_n_read_io_threads,

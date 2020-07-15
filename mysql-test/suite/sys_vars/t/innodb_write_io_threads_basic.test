@@ -23,6 +23,8 @@ select * from information_schema.session_variables where variable_name='innodb_w
 #
 select @@innodb_write_io_threads into @n;
 set global innodb_write_io_threads=1;
+select @@innodb_write_io_threads;
 set global innodb_write_io_threads=64;
+select @@innodb_write_io_threads;
 set global innodb_write_io_threads=@n;
 
