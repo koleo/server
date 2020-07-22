@@ -44,6 +44,8 @@ sub skip_combinations {
 
   $skip{'include/not_windows.inc'} = 'Requires not Windows' if IS_WINDOWS;
 
+  $skip{'include/linux.inc'} = "Requires Linux" unless $^O eq  "linux";
+
   $skip{'main/plugin_loaderr.test'} = 'needs compiled-in innodb'
             unless $::mysqld_variables{'innodb'} eq "ON";
 
