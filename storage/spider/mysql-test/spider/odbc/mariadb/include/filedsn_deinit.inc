@@ -1,0 +1,7 @@
+--let $MASTER_1_COMMENT_2_1= $MASTER_1_COMMENT_2_1_BACKUP
+--remove_file $MYSQLTEST_VARDIR/tmp/spider_filedsn.dsn
+--disable_query_log
+--disable_result_log
+--source ../t/test_deinit.inc
+--enable_result_log
+--enable_query_log

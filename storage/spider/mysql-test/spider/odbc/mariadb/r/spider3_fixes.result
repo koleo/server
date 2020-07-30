@@ -11,23 +11,23 @@ connection master_1;
 DROP DATABASE IF EXISTS auto_test_local;
 CREATE DATABASE auto_test_local;
 USE auto_test_local;
-SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"') ;
-SELECT spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"') ;
+SELECT spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"') ;
-SELECT spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"') ;
+SELECT spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"')
 1
 
 test select 1
@@ -50,21 +50,21 @@ PRIMARY KEY (id)
 ) MASTER_1_ENGINE MASTER_1_CHARSET MASTER_1_COMMENT_INCREMENT1_1
 MASTER_1_AUTO_INCREMENT_INCREMENT2
 MASTER_1_AUTO_INCREMENT_OFFSET2
-spider_direct_sql('SET SESSION AUTO_INCREMENT_INCREMENT = 4', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('SET SESSION AUTO_INCREMENT_INCREMENT = 4', '', 'srv "s_2_1", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('SET SESSION AUTO_INCREMENT_OFFSET = 2', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('SET SESSION AUTO_INCREMENT_OFFSET = 2', '', 'srv "s_2_1", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('SET SESSION AUTO_INCREMENT_INCREMENT = 4', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('SET SESSION AUTO_INCREMENT_INCREMENT = 4', '', 'srv "s_2_2", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('SET SESSION AUTO_INCREMENT_OFFSET = 3', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('SET SESSION AUTO_INCREMENT_OFFSET = 3', '', 'srv "s_2_2", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('SET SESSION AUTO_INCREMENT_INCREMENT = 4', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('SET SESSION AUTO_INCREMENT_INCREMENT = 4', '', 'srv "s_2_1", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('SET SESSION AUTO_INCREMENT_OFFSET = 2', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('SET SESSION AUTO_INCREMENT_OFFSET = 2', '', 'srv "s_2_1", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('SET SESSION AUTO_INCREMENT_INCREMENT = 4', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('SET SESSION AUTO_INCREMENT_INCREMENT = 4', '', 'srv "s_2_2", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('SET SESSION AUTO_INCREMENT_OFFSET = 3', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('SET SESSION AUTO_INCREMENT_OFFSET = 3', '', 'srv "s_2_2", driver "MariaDB ODBC 3.0 Driver"')
 1
 INSERT INTO t1 () VALUES ();
 SELECT LAST_INSERT_ID();
@@ -191,11 +191,11 @@ MAX(id)
 deinit
 connection master_1;
 DROP DATABASE IF EXISTS auto_test_local;
-SELECT spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", driver "MariaDB ODBC 3.0 Driver"')
 1
 for slave1_1
 for child3

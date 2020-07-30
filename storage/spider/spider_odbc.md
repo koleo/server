@@ -104,40 +104,27 @@ PARTITION BY KEY(c1) (
 ### Parameters for ODBC connections
 ---
 The following parameters are available for ODBC connections.
--   Common
-    -   default_group: ODBC driver name
-    -   default_file: ODBC directory name (default_group is required for using this parameter)
-    -   dsn: ODBC DSN
-    -   database: ODBC database
-    -   user: ODBC UID
-    -   password: ODBC PWD (user is required for using this parameter)
--   odbc_mariadb only
-    -   host: ODBC server
-    -   port: ODBC port
-    -   socket: socket file name
--   odbc only
-    -   host: ODBC server (database is required for using this parameter)
-    -   port: ODBC port (database is required for using this parameter)
+-   filedsn: ODBC dsn file name
+-   dsn: ODBC DSN
+-   driver: ODBC driver name
+-   host: ODBC server
+-   socket: socket file name
+-   port: ODBC port
+-   database: ODBC database
+-   user: ODBC UID
+-   password: ODBC PWD (user is required for using this parameter)
 
 Additionally, ssl_ca, ssl_capath, ssl_cert, ssl_cipher, ssl_key can be used for adding specific parameters of ODBC drivers.
--   odbc_mariadb:
-    -   ssl_ca is added on top of ODBC connection parameters.
-    -   ssl_capath is added between ODBC DRIVER and DSN.
-    -   ssl_cert is added between ODBC PORT and DATABASE.
-    -   ssl_cipher is added between ODBC DATABASE and UID.
-    -   ssl_key is added on bottom of ODBC connection parameters.
--   odbc:
-    -   ssl_ca is added on top of ODBC connection parameters.
-    -   ssl_capath is added between ODBC DRIVER and DSN.
-    -   ssl_cert is added between ODBC DSN and DATABASE.
-    -   ssl_cipher is added between ODBC DATABASE and UID.
-    -   ssl_key is added on bottom of ODBC connection parameters.
+-   ssl_ca is added on top of ODBC connection parameters.
+-   ssl_capath is added between DSN and ODBC DRIVER.
+-   ssl_cert is added between ODBC PORT and DATABASE.
+-   ssl_cipher is added between ODBC DATABASE and UID.
+-   ssl_key is added on bottom of ODBC connection parameters.
 
 ### Difference between odbc_mariadb and odbc
 ---
 There are some internal differences.
 -   odbc_mariadb:
-    -   "DATABASE=database;SERVER=host;PORT=port;" in connection string.
     -   The name quote is back quote.
     -   The modes of lock table are "read local", "read", "low_priority write", and "write".
     -   Lock table command causes a commit of transaction.
@@ -146,7 +133,6 @@ There are some internal differences.
     -   The shared lock word with SELECT is "lock in shared mode".
     -   The name of cursors have to change for each thread.
 -   odbc:
-    -   "DATABASE=database:host:port;" in connection string.
     -   The name quote is double quote.
     -   The modes of lock table are "in share mode", and "in exclusive mode".
     -   Lock table command has to inside of transaction.

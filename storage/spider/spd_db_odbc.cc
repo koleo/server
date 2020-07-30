@@ -1254,11 +1254,14 @@ int spider_db_odbc::connect(
   SQLRETURN ret;
   SQLUINTEGER login_tmo;
   SQLUINTEGER net_tmo;
-  bool use_driver;
-  bool use_dir;
+  bool use_filedsn;
   bool use_dsn;
+  bool use_driver;
   bool use_db;
   bool use_uid;
+  bool use_socket;
+  bool use_server;
+  bool use_port;
   uint conn_str_len;
   SQLSMALLINT dummy_len;
   uchar *conn_str;
@@ -1319,41 +1322,55 @@ int spider_db_odbc::connect(
     }
   }
 
+  net_tmo = conn->net_read_timeout > conn->net_write_timeout ?
+    conn->net_read_timeout : conn->net_write_timeout;
+  (void) SQLSetConnectAttr(hdbc, SQL_ATTR_CONNECTION_TIMEOUT,
+    (SQLPOINTER) (SQLULEN) net_tmo, SQL_IS_UINTEGER);
+
   /* create connect string */
-  use_driver = conn->tgt_default_group_length ? TRUE : FALSE;
-  DBUG_PRINT("info",("spider use_driver:%s", use_driver ? "TRUE" : "FALSE"));
-  use_dir = conn->tgt_default_file_length ? TRUE : FALSE;
-  DBUG_PRINT("info",("spider use_dir:%s", use_dir ? "TRUE" : "FALSE"));
+  use_filedsn = conn->tgt_filedsn_length ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_filedsn:%s", use_filedsn ? "TRUE" : "FALSE"));
   use_dsn = conn->tgt_dsn_length ? TRUE : FALSE;
   DBUG_PRINT("info",("spider use_dsn:%s", use_dsn ? "TRUE" : "FALSE"));
+  use_driver = conn->tgt_driver_length ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_driver:%s", use_driver ? "TRUE" : "FALSE"));
+  use_server = conn->tgt_host_length ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_server:%s", use_server ? "TRUE" : "FALSE"));
+  use_socket = conn->tgt_socket_length ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_socket:%s", use_socket ? "TRUE" : "FALSE"));
+  use_port = conn->tgt_port ? TRUE : FALSE;
+  DBUG_PRINT("info",("spider use_port:%s", use_port ? "TRUE" : "FALSE"));
   use_db = conn->tgt_db_length ? TRUE : FALSE;
   DBUG_PRINT("info",("spider use_db:%s", use_db ? "TRUE" : "FALSE"));
   use_uid = conn->tgt_username_length ? TRUE : FALSE;
   DBUG_PRINT("info",("spider use_uid:%s", use_uid ? "TRUE" : "FALSE"));
   dummy_len = 0;
   conn_str_len =
-    (use_driver ?
-      (SPIDER_DB_DRIVER_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
-        SPIDER_SQL_OPEN_BRACE_LEN + conn->tgt_default_group_length * 2 +
-        SPIDER_SQL_CLOSE_BRACE_LEN + SPIDER_SQL_SEMICOLON_LEN +
-        (use_dir ?
-          (SPIDER_DB_DIRECTORY_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
-            SPIDER_SQL_OPEN_BRACE_LEN + SPIDER_SQL_CLOSE_BRACE_LEN +
-            conn->tgt_default_file_length * 2 + SPIDER_SQL_SEMICOLON_LEN
-            ) :
-          0)
-        ) :
-      0) +
+    (use_filedsn ?
+      (SPIDER_DB_FILEDSN_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
+        conn->tgt_filedsn_length + SPIDER_SQL_SEMICOLON_LEN) : 0) +
     (use_dsn ?
       (SPIDER_DB_DSN_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
         conn->tgt_dsn_length + SPIDER_SQL_SEMICOLON_LEN) : 0) +
+    (use_driver ?
+      (SPIDER_DB_DRIVER_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
+        SPIDER_SQL_OPEN_BRACE_LEN + conn->tgt_driver_length * 2 +
+        SPIDER_SQL_CLOSE_BRACE_LEN + SPIDER_SQL_SEMICOLON_LEN) : 0) +
+    (use_server ?
+      (SPIDER_DB_SERVER_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
+        SPIDER_SQL_OPEN_BRACE_LEN + SPIDER_SQL_CLOSE_BRACE_LEN +
+        conn->tgt_host_length * 2 + SPIDER_SQL_SEMICOLON_LEN) : 0) +
+    (use_socket ?
+      (SPIDER_DB_SOCKET_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
+        SPIDER_SQL_OPEN_BRACE_LEN + SPIDER_SQL_CLOSE_BRACE_LEN +
+        conn->tgt_socket_length * 2 + SPIDER_SQL_SEMICOLON_LEN) : 0) +
+    (use_port ?
+      (SPIDER_DB_PORT_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
+        /* conn->tgt_port_length */ 5 + SPIDER_SQL_SEMICOLON_LEN) : 0) +
     (use_db ?
       (SPIDER_SQL_DATABASE_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
         SPIDER_SQL_OPEN_BRACE_LEN + SPIDER_SQL_CLOSE_BRACE_LEN +
-        conn->tgt_db_length * 2 + SPIDER_SQL_COLON_LEN +
-        conn->tgt_host_length * 2 +
-        SPIDER_SQL_COLON_LEN + /* conn->tgt_port_length */ 5 +
-        SPIDER_SQL_SEMICOLON_LEN) : 0) +
+        conn->tgt_db_length * 2 + SPIDER_SQL_SEMICOLON_LEN) : 0) +
     (use_uid ?
       (SPIDER_SQL_UID_LEN + SPIDER_SQL_ODBC_EQUAL_LEN +
         SPIDER_SQL_OPEN_BRACE_LEN + SPIDER_SQL_CLOSE_BRACE_LEN +
@@ -1382,46 +1399,17 @@ int spider_db_odbc::connect(
     tmp_str += conn->tgt_ssl_ca_length;
   }
 
-  if (use_driver)
+  if (use_filedsn)
   {
-    DBUG_PRINT("info",("spider driver:%s", conn->tgt_default_group));
-    memcpy(tmp_str, SPIDER_DB_DRIVER_STR, SPIDER_DB_DRIVER_LEN);
-    tmp_str += SPIDER_DB_DRIVER_LEN;
+    DBUG_PRINT("info",("spider filedsn:%s", conn->tgt_filedsn));
+    memcpy(tmp_str, SPIDER_DB_FILEDSN_STR, SPIDER_DB_FILEDSN_LEN);
+    tmp_str += SPIDER_DB_FILEDSN_LEN;
     memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
     tmp_str += SPIDER_SQL_ODBC_EQUAL_LEN;
-    memcpy(tmp_str, SPIDER_SQL_OPEN_BRACE_STR, SPIDER_SQL_OPEN_BRACE_LEN);
-    tmp_str += SPIDER_SQL_OPEN_BRACE_LEN;
-    tmp_str = spider_duplicate_char(
-      tmp_str, *((uchar *) SPIDER_SQL_CLOSE_BRACE_STR),
-      (uchar *) conn->tgt_default_group, conn->tgt_default_group_length);
-    memcpy(tmp_str, SPIDER_SQL_CLOSE_BRACE_STR, SPIDER_SQL_CLOSE_BRACE_LEN);
-    tmp_str += SPIDER_SQL_CLOSE_BRACE_LEN;
+    memcpy(tmp_str, conn->tgt_filedsn, conn->tgt_filedsn_length);
+    tmp_str += conn->tgt_filedsn_length;
     memcpy(tmp_str, SPIDER_SQL_SEMICOLON_STR, SPIDER_SQL_SEMICOLON_LEN);
     tmp_str += SPIDER_SQL_SEMICOLON_LEN;
-    if (use_dir)
-    {
-      DBUG_PRINT("info",("spider dir:%s", conn->tgt_default_file));
-      memcpy(tmp_str, SPIDER_DB_DIRECTORY_STR, SPIDER_DB_DIRECTORY_LEN);
-      tmp_str += SPIDER_DB_DIRECTORY_LEN;
-      memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
-      tmp_str += SPIDER_SQL_ODBC_EQUAL_LEN;
-      memcpy(tmp_str, SPIDER_SQL_OPEN_BRACE_STR, SPIDER_SQL_OPEN_BRACE_LEN);
-      tmp_str += SPIDER_SQL_OPEN_BRACE_LEN;
-      tmp_str = spider_duplicate_char(
-        tmp_str, *((uchar *) SPIDER_SQL_CLOSE_BRACE_STR),
-        (uchar *) conn->tgt_default_file, conn->tgt_default_file_length);
-      memcpy(tmp_str, SPIDER_SQL_CLOSE_BRACE_STR, SPIDER_SQL_CLOSE_BRACE_LEN);
-      tmp_str += SPIDER_SQL_CLOSE_BRACE_LEN;
-      memcpy(tmp_str, SPIDER_SQL_SEMICOLON_STR, SPIDER_SQL_SEMICOLON_LEN);
-      tmp_str += SPIDER_SQL_SEMICOLON_LEN;
-    }
-  }
-
-  /* additional connect parameter for ODBC */
-  if (conn->tgt_ssl_capath_length)
-  {
-    memcpy(tmp_str, conn->tgt_ssl_capath, conn->tgt_ssl_capath_length);
-    tmp_str += conn->tgt_ssl_capath_length;
   }
 
   if (use_dsn)
@@ -1433,6 +1421,77 @@ int spider_db_odbc::connect(
     tmp_str += SPIDER_SQL_ODBC_EQUAL_LEN;
     memcpy(tmp_str, conn->tgt_dsn, conn->tgt_dsn_length);
     tmp_str += conn->tgt_dsn_length;
+    memcpy(tmp_str, SPIDER_SQL_SEMICOLON_STR, SPIDER_SQL_SEMICOLON_LEN);
+    tmp_str += SPIDER_SQL_SEMICOLON_LEN;
+  }
+
+  /* additional connect parameter for ODBC */
+  if (conn->tgt_ssl_capath_length)
+  {
+    memcpy(tmp_str, conn->tgt_ssl_capath, conn->tgt_ssl_capath_length);
+    tmp_str += conn->tgt_ssl_capath_length;
+  }
+
+  if (use_driver)
+  {
+    DBUG_PRINT("info",("spider driver:%s", conn->tgt_driver));
+    memcpy(tmp_str, SPIDER_DB_DRIVER_STR, SPIDER_DB_DRIVER_LEN);
+    tmp_str += SPIDER_DB_DRIVER_LEN;
+    memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
+    tmp_str += SPIDER_SQL_ODBC_EQUAL_LEN;
+    memcpy(tmp_str, SPIDER_SQL_OPEN_BRACE_STR, SPIDER_SQL_OPEN_BRACE_LEN);
+    tmp_str += SPIDER_SQL_OPEN_BRACE_LEN;
+    tmp_str = spider_duplicate_char(
+      tmp_str, *((uchar *) SPIDER_SQL_CLOSE_BRACE_STR),
+      (uchar *) conn->tgt_driver, conn->tgt_driver_length);
+    memcpy(tmp_str, SPIDER_SQL_CLOSE_BRACE_STR, SPIDER_SQL_CLOSE_BRACE_LEN);
+    tmp_str += SPIDER_SQL_CLOSE_BRACE_LEN;
+    memcpy(tmp_str, SPIDER_SQL_SEMICOLON_STR, SPIDER_SQL_SEMICOLON_LEN);
+    tmp_str += SPIDER_SQL_SEMICOLON_LEN;
+  }
+
+  if (use_server)
+  {
+    memcpy(tmp_str, SPIDER_DB_SERVER_STR, SPIDER_DB_SERVER_LEN);
+    tmp_str += SPIDER_DB_SERVER_LEN;
+    memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
+    tmp_str += SPIDER_SQL_ODBC_EQUAL_LEN;
+    memcpy(tmp_str, SPIDER_SQL_OPEN_BRACE_STR, SPIDER_SQL_OPEN_BRACE_LEN);
+    tmp_str += SPIDER_SQL_OPEN_BRACE_LEN;
+    tmp_str = spider_duplicate_char(
+      tmp_str, *((uchar *) SPIDER_SQL_CLOSE_BRACE_STR),
+      (uchar *) conn->tgt_host, conn->tgt_host_length);
+    memcpy(tmp_str, SPIDER_SQL_CLOSE_BRACE_STR, SPIDER_SQL_CLOSE_BRACE_LEN);
+    tmp_str += SPIDER_SQL_CLOSE_BRACE_LEN;
+    memcpy(tmp_str, SPIDER_SQL_SEMICOLON_STR, SPIDER_SQL_SEMICOLON_LEN);
+    tmp_str += SPIDER_SQL_SEMICOLON_LEN;
+  }
+
+  if (use_socket)
+  {
+    memcpy(tmp_str, SPIDER_DB_SOCKET_STR, SPIDER_DB_SOCKET_LEN);
+    tmp_str += SPIDER_DB_SOCKET_LEN;
+    memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
+    tmp_str += SPIDER_SQL_ODBC_EQUAL_LEN;
+    memcpy(tmp_str, SPIDER_SQL_OPEN_BRACE_STR, SPIDER_SQL_OPEN_BRACE_LEN);
+    tmp_str += SPIDER_SQL_OPEN_BRACE_LEN;
+    tmp_str = spider_duplicate_char(
+      tmp_str, *((uchar *) SPIDER_SQL_CLOSE_BRACE_STR),
+      (uchar *) conn->tgt_socket, conn->tgt_socket_length);
+    memcpy(tmp_str, SPIDER_SQL_CLOSE_BRACE_STR, SPIDER_SQL_CLOSE_BRACE_LEN);
+    tmp_str += SPIDER_SQL_CLOSE_BRACE_LEN;
+    memcpy(tmp_str, SPIDER_SQL_SEMICOLON_STR, SPIDER_SQL_SEMICOLON_LEN);
+    tmp_str += SPIDER_SQL_SEMICOLON_LEN;
+  }
+
+  if (use_port)
+  {
+    memcpy(tmp_str, SPIDER_DB_PORT_STR, SPIDER_DB_PORT_LEN);
+    tmp_str += SPIDER_DB_PORT_LEN;
+    memcpy(tmp_str, SPIDER_SQL_ODBC_EQUAL_STR, SPIDER_SQL_ODBC_EQUAL_LEN);
+    tmp_str += SPIDER_SQL_ODBC_EQUAL_LEN;
+    my_sprintf((char *) tmp_str, ((char *) tmp_str, "%05ld", conn->tgt_port));
+    tmp_str += /* conn->tgt_port_length */ 5;
     memcpy(tmp_str, SPIDER_SQL_SEMICOLON_STR, SPIDER_SQL_SEMICOLON_LEN);
     tmp_str += SPIDER_SQL_SEMICOLON_LEN;
   }
@@ -1456,15 +1515,6 @@ int spider_db_odbc::connect(
     tmp_str = spider_duplicate_char(
       tmp_str, *((uchar *) SPIDER_SQL_CLOSE_BRACE_STR),
       (uchar *) conn->tgt_db, conn->tgt_db_length);
-    memcpy(tmp_str, SPIDER_SQL_COLON_STR, SPIDER_SQL_COLON_LEN);
-    tmp_str += SPIDER_SQL_COLON_LEN;
-    tmp_str = spider_duplicate_char(
-      tmp_str, *((uchar *) SPIDER_SQL_CLOSE_BRACE_STR),
-      (uchar *) conn->tgt_host, conn->tgt_host_length);
-    memcpy(tmp_str, SPIDER_SQL_COLON_STR, SPIDER_SQL_COLON_LEN);
-    tmp_str += SPIDER_SQL_COLON_LEN;
-    my_sprintf((char *) tmp_str, ((char *) tmp_str, "%05ld", conn->tgt_port));
-    tmp_str += /* conn->tgt_port_length */ 5;
     memcpy(tmp_str, SPIDER_SQL_CLOSE_BRACE_STR, SPIDER_SQL_CLOSE_BRACE_LEN);
     tmp_str += SPIDER_SQL_CLOSE_BRACE_LEN;
     memcpy(tmp_str, SPIDER_SQL_SEMICOLON_STR, SPIDER_SQL_SEMICOLON_LEN);
@@ -1532,11 +1582,6 @@ int spider_db_odbc::connect(
     }
   }
   my_afree(conn_str);
-
-  net_tmo = conn->net_read_timeout > conn->net_write_timeout ?
-    conn->net_read_timeout : conn->net_write_timeout;
-  (void) SQLSetConnectAttr(hdbc, SQL_ATTR_CONNECTION_TIMEOUT,
-    (SQLPOINTER) (SQLULEN) net_tmo, SQL_IS_UINTEGER);
   DBUG_RETURN(0);
 
 error_connect:

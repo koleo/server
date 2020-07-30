@@ -26,51 +26,51 @@ let $MASTER_1_COPY_TABLES_2_1=
   SELECT spider_copy_tables('ta_l', '0', '1');
 
 let $MASTER_1_COMMENT_HA_2_1=
-  COMMENT='database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", table "ta_r ta_r3",
+  COMMENT='database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", table "ta_r ta_r3",
   wrapper "odbc_mariadb"'
   CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2"';
 let $MASTER_1_COMMENT_HA_AS_2_1=
-  COMMENT='database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", table "ta_r ta_r3",
+  COMMENT='database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", table "ta_r ta_r3",
   wrapper "odbc_mariadb"'
   CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2", alc "1"';
 let $MASTER_1_COMMENT_HA_P_2_1=
   COMMENT='msi "$CHILD3_1_SERVER_ID", mkd "2"'
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001"'
   );
 let $MASTER_1_COMMENT_HA_AS_P_2_1=
   COMMENT='msi "$CHILD3_1_SERVER_ID", mkd "2", alc "1"'
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001"'
   );
 let $MASTER_1_SET_RECOVERY_STATUS_P_2_1=
   ALTER TABLE ta_l2
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001", lst "0 2"'
   );
 let $MASTER_1_SET_OK_STATUS_P_2_1=
   ALTER TABLE ta_l2
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001", lst "0 1"'
   );
 let $MASTER_1_SET_OK_STATUS_AS_P_2_1=
   ALTER TABLE ta_l2
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001", lst "1 0"'
   );
 let $MASTER_1_COPY_TABLES_P_2_1=

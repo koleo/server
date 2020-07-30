@@ -22,32 +22,32 @@ connection master_1;
 DROP DATABASE IF EXISTS auto_test_local;
 CREATE DATABASE auto_test_local;
 USE auto_test_local;
-SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"') ;
-SELECT spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"') ;
+SELECT spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('CREATE DATABASE auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('USE auto_test_remote', '', 'srv "s_2_1_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"') ;
-SELECT spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"') ;
+SELECT spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('CREATE DATABASE auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('USE auto_test_remote2', '', 'srv "s_2_2_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote3', '', 'srv "s_2_3_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote3', '', 'srv "s_2_3_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote3', '', 'srv "s_2_3_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE IF EXISTS auto_test_remote3', '', 'srv "s_2_3_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('CREATE DATABASE auto_test_remote3', '', 'srv "s_2_3_test", default_group "MariaDB ODBC 3.0 Driver"') ;
-SELECT spider_direct_sql('USE auto_test_remote3', '', 'srv "s_2_3_test", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('CREATE DATABASE auto_test_remote3', '', 'srv "s_2_3_test", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('CREATE DATABASE auto_test_remote3', '', 'srv "s_2_3_test", driver "MariaDB ODBC 3.0 Driver"') ;
+SELECT spider_direct_sql('USE auto_test_remote3', '', 'srv "s_2_3_test", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('CREATE DATABASE auto_test_remote3', '', 'srv "s_2_3_test", driver "MariaDB ODBC 3.0 Driver"')
 1
-spider_direct_sql('USE auto_test_remote3', '', 'srv "s_2_3_test", default_group "MariaDB ODBC 3.0 Driver"')
+spider_direct_sql('USE auto_test_remote3', '', 'srv "s_2_3_test", driver "MariaDB ODBC 3.0 Driver"')
 1
 connection child3_1;
 DROP DATABASE IF EXISTS auto_test_local;
@@ -160,6 +160,8 @@ spider_tables	CREATE TABLE `spider_tables` (
   `default_file` text COLLATE utf8_bin DEFAULT NULL,
   `default_group` char(64) COLLATE utf8_bin DEFAULT NULL,
   `dsn` char(64) COLLATE utf8_bin DEFAULT NULL,
+  `filedsn` text COLLATE utf8_bin DEFAULT NULL,
+  `driver` char(64) COLLATE utf8_bin DEFAULT NULL,
   `tgt_db_name` char(64) COLLATE utf8_bin DEFAULT NULL,
   `tgt_table_name` char(64) COLLATE utf8_bin DEFAULT NULL,
   `link_status` tinyint(4) NOT NULL DEFAULT 1,
@@ -170,9 +172,9 @@ spider_tables	CREATE TABLE `spider_tables` (
   KEY `idx1` (`priority`)
 ) ENGINE=Aria DEFAULT CHARSET=utf8 COLLATE=utf8_bin PAGE_CHECKSUM=1 TRANSACTIONAL=1
 select * from mysql.spider_tables;
-db_name	table_name	link_id	priority	server	scheme	host	port	socket	username	password	ssl_ca	ssl_capath	ssl_cert	ssl_cipher	ssl_key	ssl_verify_server_cert	monitoring_binlog_pos_at_failing	default_file	default_group	dsn	tgt_db_name	tgt_table_name	link_status	block_status	static_link_id
-auto_test_local	ta_l	0	1000000	s_2_1	odbc_mariadb		NULL									0	0		MariaDB ODBC 3.0 Driver		auto_test_remote	ta_r	1	0	NULL
-auto_test_local	ta_l	1	1000000	s_2_2	odbc_mariadb		NULL									0	0		MariaDB ODBC 3.0 Driver		auto_test_remote2	ta_r3	2	0	NULL
+db_name	table_name	link_id	priority	server	scheme	host	port	socket	username	password	ssl_ca	ssl_capath	ssl_cert	ssl_cipher	ssl_key	ssl_verify_server_cert	monitoring_binlog_pos_at_failing	default_file	default_group	dsn	filedsn	driver	tgt_db_name	tgt_table_name	link_status	block_status	static_link_id
+auto_test_local	ta_l	0	1000000	s_2_1	odbc_mariadb		NULL									0	0					MariaDB ODBC 3.0 Driver	auto_test_remote	ta_r	1	0	NULL
+auto_test_local	ta_l	1	1000000	s_2_2	odbc_mariadb		NULL									0	0					MariaDB ODBC 3.0 Driver	auto_test_remote2	ta_r3	2	0	NULL
 SELECT spider_copy_tables('ta_l', '0', '1');
 spider_copy_tables('ta_l', '0', '1')
 1
@@ -279,14 +281,14 @@ spider_flush_table_mon_cache()
 deinit
 connection master_1;
 DROP DATABASE IF EXISTS auto_test_local;
-SELECT spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE auto_test_remote', '', 'srv "s_2_1", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE auto_test_remote2', '', 'srv "s_2_2", driver "MariaDB ODBC 3.0 Driver"')
 1
-SELECT spider_direct_sql('DROP DATABASE auto_test_remote3', '', 'srv "s_2_3", default_group "MariaDB ODBC 3.0 Driver"');
-spider_direct_sql('DROP DATABASE auto_test_remote3', '', 'srv "s_2_3", default_group "MariaDB ODBC 3.0 Driver"')
+SELECT spider_direct_sql('DROP DATABASE auto_test_remote3', '', 'srv "s_2_3", driver "MariaDB ODBC 3.0 Driver"');
+spider_direct_sql('DROP DATABASE auto_test_remote3', '', 'srv "s_2_3", driver "MariaDB ODBC 3.0 Driver"')
 1
 connection child3_1;
 DROP DATABASE IF EXISTS auto_test_local;

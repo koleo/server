@@ -66,16 +66,6 @@ public:
     SPIDER_CONN *conn
   );
   virtual ~spider_db_odbc_mariadb();
-  virtual int connect(
-    char *tgt_host,
-    char *tgt_username,
-    char *tgt_password,
-    long tgt_port,
-    char *tgt_socket,
-    char *server_name,
-    int connect_retry_count,
-    longlong connect_retry_interval
-  );
   virtual void disconnect();
   virtual int exec_query(
     const char *query,

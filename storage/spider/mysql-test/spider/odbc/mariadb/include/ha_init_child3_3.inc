@@ -19,15 +19,15 @@ let $CHILD3_3_CHECK_LINK_FAILED_LOG=
 let $CHILD3_3_SET_RECOVERY_STATUS_2_1=
   ALTER TABLE ta_l
   CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2",
-  database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", lst "0 2"';
+  database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", lst "0 2"';
 let $CHILD3_3_SET_OK_STATUS_2_1=
   ALTER TABLE ta_l
   CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2",
-  database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", lst "0 1"';
+  database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", lst "0 1"';
 let $CHILD3_3_SET_OK_STATUS_AS_2_1=
   ALTER TABLE ta_l
   CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2", alc "1",
-  database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", lst "1 0"';
+  database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", lst "1 0"';
 
 let $CHILD3_3_DROP_TABLES_HA_2_1=
   DROP TABLE IF EXISTS ta_l;
@@ -42,7 +42,7 @@ if ($VERSION_COMPILE_OS_WIN)
     ) $CHILD3_3_ENGINE $CHILD3_3_CHARSET
     COMMENT='table "ta_r ta_r3"'
     CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2",
-    database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver"';
+    database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver"';
   let $CHILD3_3_CREATE_TABLES_HA_AS_2_1=
     CREATE TABLE ta_l (
       a INT DEFAULT 10,
@@ -52,7 +52,7 @@ if ($VERSION_COMPILE_OS_WIN)
     ) $CHILD3_3_ENGINE $CHILD3_3_CHARSET
     COMMENT='table "ta_r ta_r3"'
     CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2", alc "1",
-    database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver"';
+    database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver"';
 }
 if (!$VERSION_COMPILE_OS_WIN)
 {
@@ -65,7 +65,7 @@ if (!$VERSION_COMPILE_OS_WIN)
     ) $CHILD3_3_ENGINE $CHILD3_3_CHARSET
     COMMENT='table "ta_r ta_r3"'
     CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2",
-    database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver"';
+    database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver"';
   let $CHILD3_3_CREATE_TABLES_HA_AS_2_1=
     CREATE TABLE ta_l (
       a INT DEFAULT 10,
@@ -75,7 +75,7 @@ if (!$VERSION_COMPILE_OS_WIN)
     ) $CHILD3_3_ENGINE $CHILD3_3_CHARSET
     COMMENT='table "ta_r ta_r3"'
     CONNECTION='msi "$CHILD3_1_SERVER_ID", mkd "2", alc "1",
-    database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver"';
+    database "auto_test_remote auto_test_remote2", srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver"';
 }
 let $CHILD3_3_DROP_TABLES_HA_P_2_1=
   DROP TABLE IF EXISTS ta_l2;
@@ -88,9 +88,9 @@ let $CHILD3_3_CREATE_TABLES_HA_P_2_1=
   ) $CHILD3_3_ENGINE $CHILD3_3_CHARSET
   COMMENT='msi "$CHILD3_1_SERVER_ID", mkd "2"'
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001"'
   );
 let $CHILD3_3_CREATE_TABLES_HA_AS_P_2_1=
@@ -102,32 +102,32 @@ let $CHILD3_3_CREATE_TABLES_HA_AS_P_2_1=
   ) $CHILD3_3_ENGINE $CHILD3_3_CHARSET
   COMMENT='msi "$CHILD3_1_SERVER_ID", mkd "2", alc "1"'
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001"'
   );
 let $CHILD3_3_SET_RECOVERY_STATUS_P_2_1=
   ALTER TABLE ta_l2
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001", lst "0 2"'
   );
 let $CHILD3_3_SET_OK_STATUS_P_2_1=
   ALTER TABLE ta_l2
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001", lst "0 1"'
   );
 let $CHILD3_3_SET_OK_STATUS_AS_P_2_1=
   ALTER TABLE ta_l2
   PARTITION BY KEY(a) (
-    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
+    PARTITION pt1 COMMENT='srv "s_2_1 s_2_2", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r ta_r3",
     priority "1000"',
-    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", default_group "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
+    PARTITION pt2 COMMENT='srv "s_2_1 s_2_3", driver "MariaDB\\\\ ODBC\\\\ 3.0\\\\ Driver", tbl "ta_r2 ta_r4",
     priority "1000001", lst "1 0"'
   );
