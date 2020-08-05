@@ -9,12 +9,12 @@ SET SESSION wsrep_osu_method=NBO;
 ALTER TABLE t1 LOCK=SHARED, ADD PRIMARY KEY (f1);;
 connection node_2;
 connection node_2a;
-SELECT COUNT(*) = 1 FROM t1;
-COUNT(*) = 1
+SELECT COUNT(*) AS EXPECT_1 FROM t1;
+EXPECT_1
 1
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
-VARIABLE_VALUE = 2
-1
+SELECT VARIABLE_VALUE as WSREP_CLUSTER_SIZE_EXPECT_2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+WSREP_CLUSTER_SIZE_EXPECT_2
+2
 SHOW CREATE TABLE t1;
 Table	Create Table
 t1	CREATE TABLE `t1` (
@@ -38,3 +38,5 @@ CALL mtr.add_suppression("Aborting");
 CALL mtr.add_suppression("Plugin 'InnoDB' will be forced to shutdown");
 CALL mtr.add_suppression("Slave SQL: Error 'Got error 7 during COMMIT'");
 CALL mtr.add_suppression("TO isolation failed for NBO phase two:");
+CALL mtr.add_suppression("WSREP: Closing during nonblocking operation. Node will be left in inconsistent state and must be re-initialized either by full SST or from backup.");
+CALL mtr.add_suppression("WSREP: Failed to report last committed .*");

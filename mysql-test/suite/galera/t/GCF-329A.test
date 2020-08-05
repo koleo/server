@@ -26,12 +26,20 @@ SET SESSION wsrep_osu_method=NBO;
 --connection node_2a
 --source include/galera_wait_ready.inc
 
-SELECT COUNT(*) = 1 FROM t1;
-SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+--let $wait_condition = SELECT VARIABLE_VALUE = 2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size'
+--source include/wait_condition.inc
+
+SELECT COUNT(*) AS EXPECT_1 FROM t1;
+SELECT VARIABLE_VALUE as WSREP_CLUSTER_SIZE_EXPECT_2 FROM INFORMATION_SCHEMA.GLOBAL_STATUS WHERE VARIABLE_NAME = 'wsrep_cluster_size';
+
+--let $wait_condition = SELECT COUNT(*) = 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_NAME='t1' AND CONSTRAINT_TYPE='PRIMARY KEY'
+--source include/wait_condition.inc
+
 SHOW CREATE TABLE t1;
 
 --connection node_1
 --reap
+
 SHOW CREATE TABLE t1;
 
 SET SESSION wsrep_osu_method=TOI;
@@ -47,3 +55,6 @@ CALL mtr.add_suppression("Aborting");
 CALL mtr.add_suppression("Plugin 'InnoDB' will be forced to shutdown");
 CALL mtr.add_suppression("Slave SQL: Error 'Got error 7 during COMMIT'");
 CALL mtr.add_suppression("TO isolation failed for NBO phase two:");
+CALL mtr.add_suppression("WSREP: Closing during nonblocking operation. Node will be left in inconsistent state and must be re-initialized either by full SST or from backup.");
+CALL mtr.add_suppression("WSREP: Failed to report last committed .*");
+
