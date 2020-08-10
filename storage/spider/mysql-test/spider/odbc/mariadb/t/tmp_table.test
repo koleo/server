@@ -1,0 +1,115 @@
+# This test tests for using functions
+--disable_warnings
+--disable_query_log
+--disable_result_log
+--source test_init.inc
+--enable_result_log
+--enable_query_log
+
+--echo
+--echo drop and create databases
+--connection master_1
+DROP DATABASE IF EXISTS auto_test_local;
+CREATE DATABASE auto_test_local;
+USE auto_test_local;
+if ($USE_CHILD_GROUP2)
+{
+  eval $CHILD2_1_DROP_DATABASE_IFEXISTS;
+  eval $CHILD2_1_CREATE_DATABASE;
+  eval $CHILD2_2_DROP_DATABASE_IFEXISTS;
+  eval $CHILD2_2_CREATE_DATABASE;
+}
+--enable_warnings
+
+--echo
+--echo test select 1
+--connection master_1
+SELECT 1;
+if ($USE_CHILD_GROUP2)
+{
+  if (!$OUTPUT_CHILD_GROUP2)
+  {
+    --disable_query_log
+    --disable_result_log
+  }
+  eval $CHILD2_1_DATEFORMAT;
+  eval $CHILD2_1_SELECT1;
+  eval $CHILD2_2_DATEFORMAT;
+  eval $CHILD2_2_SELECT1;
+  if (!$OUTPUT_CHILD_GROUP2)
+  {
+    --enable_query_log
+    --enable_result_log
+  }
+}
+
+--echo
+if ($USE_CHILD_GROUP2)
+{
+  if (!$OUTPUT_CHILD_GROUP2)
+  {
+    --disable_result_log
+  }
+  --disable_query_log
+  if ($OUTPUT_CHILD_GROUP2)
+  {
+    echo CHILD2_1_DROP_TEXT_PK_TABLES1;
+    echo CHILD2_1_CREATE_TEXT_PK_TABLES1;
+  }
+  --disable_warnings
+  eval $CHILD2_1_DROP_TEXT_PK_TABLES1;
+  --enable_warnings
+  eval $CHILD2_1_CREATE_TEXT_PK_TABLES1;
+  --enable_query_log
+  if (!$OUTPUT_CHILD_GROUP2)
+  {
+    --enable_result_log
+  }
+}
+--connection master_1
+--disable_query_log
+echo CREATE TEMPORARY TABLE t1 (
+  a VARCHAR(255),
+  PRIMARY KEY(a)
+) MASTER_1_ENGINE MASTER_1_CHARSET3 MASTER_1_COMMENT_TEXT_PK1_1;
+eval CREATE TEMPORARY TABLE t1 (
+  a VARCHAR(255),
+  PRIMARY KEY(a)
+) $MASTER_1_ENGINE $MASTER_1_CHARSET3 $MASTER_1_COMMENT_TEXT_PK1_1;
+--enable_query_log
+INSERT INTO t1 (a) VALUES (1);
+SELECT a FROM t1;
+DROP TEMPORARY TABLE t1;
+if ($USE_CHILD_GROUP2)
+{
+  if (!$OUTPUT_CHILD_GROUP2)
+  {
+    --disable_query_log
+    --disable_result_log
+  }
+  eval $CHILD2_1_SELECT_TEXT_PK_TABLES1;
+  if (!$OUTPUT_CHILD_GROUP2)
+  {
+    --enable_query_log
+    --enable_result_log
+  }
+}
+
+--echo
+--echo deinit
+--disable_warnings
+--connection master_1
+DROP DATABASE IF EXISTS auto_test_local;
+if ($USE_CHILD_GROUP2)
+{
+  eval $CHILD2_1_DROP_DATABASE;
+  eval $CHILD2_2_DROP_DATABASE;
+}
+--disable_query_log
+--disable_result_log
+--source test_deinit.inc
+--enable_result_log
+--enable_query_log
+--enable_warnings
+--echo
+--echo end of test
