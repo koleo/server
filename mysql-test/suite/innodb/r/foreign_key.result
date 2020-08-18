@@ -794,6 +794,7 @@ ALTER TABLE t1 ADD FOREIGN KEY (a) REFERENCES t1 (b);
 ERROR HY000: Can't create table `test`.`t1` (errno: 150 "Foreign key constraint is incorrectly formed")
 SET FOREIGN_KEY_CHECKS=DEFAULT;
 DROP TABLE t1;
+SET FOREIGN_KEY_CHECKS=DEFAULT;
 #
 # MDEV-22602 Disable UPDATE CASCADE for SQL constraints
 #
