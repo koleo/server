@@ -1545,6 +1545,9 @@ bool log_checkpoint()
 		logically empty (not even containing a MLOG_CHECKPOINT record)
 		after a clean shutdown. Perform an extra checkpoint at
 		shutdown. */
+	} else if (log_sys.log.future_fd_exists.load(
+			   std::memory_order_relaxed)) {
+		/* this ensures log resizing progress */
 	} else {
 		/* Do nothing, because nothing was logged (other than
 		a FILE_CHECKPOINT marker) since the previous checkpoint. */
