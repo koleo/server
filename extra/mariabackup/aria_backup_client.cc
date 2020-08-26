@@ -23,7 +23,7 @@
 namespace aria {
 
 const char *log_preffix = "aria_log.";
-const size_t log_preffix_len = 9;
+const size_t log_preffix_len = strlen(log_preffix);
 
 class Table {
 public:
@@ -446,12 +446,28 @@ void find_min_max_log_no(const char *datadir,
 		[&out_min, &out_max](const char *file_name)->bool {
 		if (!starts_with(file_name, log_preffix))
 			return true;
-		uint32 log_num =
-			static_cast<uint32>(strtoul(file_name + log_preffix_len, nullptr, 0));
+		const char *num_begin = file_name + log_preffix_len;
+		while(*num_begin == '0')
+			++num_begin;
+		// Aria log file number starts with 1, it can not be 0.
+		if (!*num_begin) {
+			msg("File %s does not contain aria log file number, skipping.",
+				file_name);
+			return true;
+		}
+		char *end_ptr;
+		uint32 log_num = static_cast<uint32>(strtoul(num_begin, &end_ptr, 10));
+		if (*end_ptr) {
+			msg("File %s does not contain aria log file number, skipping",
+				file_name);
+			return true;
+		}
 		if (out_max < log_num)
 			out_max = log_num;
 		if (out_min > log_num)
 			out_min = log_num;
+    msg("Found aria log file: %s, current: %u, min: %u, max: %u",
+        file_name, log_num, out_min, out_max);
 		return true;
 	});
 
@@ -521,7 +537,9 @@ void BackupImpl::scan_job(bool no_lock, unsigned thread_num) {
 	find_min_max_log_no(m_datadir_path, min_log_num, max_log_num);
 	m_last_log_num = max_log_num;
 	DBUG_ASSERT(min_log_num <= max_log_num);
-	msg(thread_num, "Found %u aria log files", max_log_num - min_log_num + 1);
+	msg(thread_num, "Found %u aria log files, minimum log number %u, "
+      "maximum log number %u, last log number %zu",
+      max_log_num - min_log_num + 1, min_log_num, max_log_num, m_last_log_num);
 	for (uint32 i = min_log_num; i <= max_log_num; ++i)
 		m_tasks_group.push_task(
 			std::bind(&BackupImpl::copy_log_file_job, this,

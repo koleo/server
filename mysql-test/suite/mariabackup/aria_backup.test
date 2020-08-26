@@ -115,7 +115,7 @@ INSERT INTO t_logs_1 VALUES
   (0), (1), (2), (3), (4), (5), (6), (7), (8), (9);
 --echo # Generate several log files
 --let $i = 0
-while ($i < 11) {
+while ($i < 14) {
 INSERT INTO t_logs_1 SELECT * FROM t_logs_1;
 --inc $i
 }
