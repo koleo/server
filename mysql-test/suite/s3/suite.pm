@@ -4,5 +4,7 @@ package My::Suite::S3;
 
 return "Need S3 engine" unless $::mysqld_variables{'s3'} eq "ON" or $ENV{HA_S3_SO};
 
+push @::global_suppressions, qr|No connection to Xpand cluster|;
+
 bless { };
 

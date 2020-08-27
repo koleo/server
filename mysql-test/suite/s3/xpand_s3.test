@@ -1,0 +1,5 @@
+#
+# MENT-879 If Xpand plugin is loaded, S3 plugin fails to load
+#
+select plugin_name, plugin_type, plugin_library, plugin_status from information_schema.plugins
+where plugin_name in ('xpand', 's3');

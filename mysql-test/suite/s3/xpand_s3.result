@@ -1,0 +1,5 @@
+select plugin_name, plugin_type, plugin_library, plugin_status from information_schema.plugins
+where plugin_name in ('xpand', 's3');
+plugin_name	plugin_type	plugin_library	plugin_status
+XPAND	STORAGE ENGINE	ha_xpand.so	ACTIVE
+S3	STORAGE ENGINE	ha_s3.so	ACTIVE
