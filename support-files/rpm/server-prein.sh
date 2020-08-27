@@ -28,8 +28,8 @@ startup script in %{_sysconfdir}/init.d/.
 
   if [ "$old_family" != "$new_family" ]; then
     error_text="$error_text
-Upgrading directly from MySQL $old_family to MariaDB $new_family may not
-be safe in all cases.  A manual dump and restore using mysqldump is
+Upgrading directly from MySQL/MariaDB $old_family to MariaDB $new_family may not
+be safe in all cases.  A manual dump and restore using mariadb-dump is
 recommended.  It is important to review the MariaDB manual's Upgrading
 section for version-specific incompatibilities.
 "
@@ -45,17 +45,19 @@ A manual upgrade is required.
 
 - Ensure that you have a complete, working backup of your data and my.cnf
   files
-- Shut down the MySQL server cleanly
-- Remove the existing MySQL packages.  Usually this command will
+- Shut down the MySQL/MariaDB server cleanly
+- Remove the existing MySQL/MariaDB packages.  Usually this command will
   list the packages you should remove:
   rpm -qa | grep -i '^mysql-'
+  or
+  rpm -qa | grep -i '^mariadb-'
 
   You may choose to use 'rpm --nodeps -ev <package-name>' to remove
-  the package which contains the mysqlclient shared library.  The
-  library will be reinstalled by the MariaDB-shared package.
+  the package which contains the mysqlclient/mariadbclient shared library.
+  The library will be reinstalled by the MariaDB-shared package.
 - Install the new MariaDB packages supplied by $myvendor
 - Ensure that the MariaDB server is started
-- Run the 'mysql_upgrade' program
+- Run the 'mariadb-upgrade' program
 
 This is a brief description of the upgrade process.  Important details
 can be found in the MariaDB manual, in the Upgrading section.
