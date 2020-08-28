@@ -4572,6 +4572,15 @@ Prepared_statement::reprepare()
     */
     thd->get_stmt_da()->clear_warning_info(thd->query_id);
   }
+  else
+  {
+    /*
+       Prepare failed and the 'copy' will be freed.
+       Now we have to restore the query_string in the so the
+       audit plugin later gets the meaningful notification.
+    */
+    thd->set_query(query(), query_length());
+  }
   return error;
 }
 
