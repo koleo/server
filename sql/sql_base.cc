@@ -3899,8 +3899,10 @@ static bool upgrade_lock_if_not_exists(THD *thd,
       thd->lex->sql_command == SQLCOM_CREATE_SEQUENCE)
   {
     DEBUG_SYNC(thd,"create_table_before_check_if_exists");
+    handlerton *hton;
     if (!create_info.or_replace() &&
-        ha_table_exists(thd, &create_table->db, &create_table->table_name))
+        ha_table_exists(thd, &create_table->db, &create_table->table_name,
+                        NULL, NULL, &hton))
     {
       if (create_info.if_not_exists())
       {
@@ -3909,7 +3911,7 @@ static bool upgrade_lock_if_not_exists(THD *thd,
                             ER_THD(thd, ER_TABLE_EXISTS_ERROR),
                             create_table->table_name.str);
       }
-      else
+      else if (!(hton->flags & HTON_IGNORE_UPDATES))
         my_error(ER_TABLE_EXISTS_ERROR, MYF(0), create_table->table_name.str);
       DBUG_RETURN(true);
     }
