@@ -3911,8 +3911,11 @@ static bool upgrade_lock_if_not_exists(THD *thd,
                             ER_THD(thd, ER_TABLE_EXISTS_ERROR),
                             create_table->table_name.str);
       }
-      else if (!(hton->flags & HTON_IGNORE_UPDATES))
+      else if (!(hton && hton != view_pseudo_hton &&
+                 hton->flags & HTON_IGNORE_UPDATES))
+      {
         my_error(ER_TABLE_EXISTS_ERROR, MYF(0), create_table->table_name.str);
+      }
       DBUG_RETURN(true);
     }
     DBUG_RETURN(thd->mdl_context.upgrade_shared_lock(
