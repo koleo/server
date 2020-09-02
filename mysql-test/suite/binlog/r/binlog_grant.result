@@ -124,6 +124,40 @@ disconnect user1;
 connection default;
 DROP USER user1@localhost;
 #
+# MENT-731: Setting of SHUTDOWN_WAIT_FOR_SLAVES should require special
+#           privilege, not generic SUPER
+#
+# Test that 'shutdown_wait_for_slaves' variable cannot be set without
+# SHUTDOWN or SUPER
+CREATE USER user1@localhost;
+GRANT ALL PRIVILEGES ON *.* TO user1@localhost;
+REVOKE SHUTDOWN, SUPER ON *.* FROM user1@localhost;
+connect user1,localhost,user1,,;
+connection user1;
+SET GLOBAL SHUTDOWN_WAIT_FOR_SLAVES=ON;
+ERROR 42000: Access denied; you need (at least one of) the SHUTDOWN, SUPER privilege(s) for this operation
+disconnect user1;
+connection default;
+DROP USER user1@localhost;
+# Test that 'shutdown_wait_for_slaves' variable can be set with SHUTDOWN
+CREATE USER user1@localhost;
+GRANT SHUTDOWN ON *.* TO user1@localhost;
+connect user1,localhost,user1,,;
+connection user1;
+SET GLOBAL SHUTDOWN_WAIT_FOR_SLAVES=ON;
+disconnect user1;
+connection default;
+DROP USER user1@localhost;
+# Test that 'shutdown_wait_for_slaves' variable can be set with SUPER
+CREATE USER user1@localhost;
+GRANT SUPER ON *.* TO user1@localhost;
+connect user1,localhost,user1,,;
+connection user1;
+SET GLOBAL SHUTDOWN_WAIT_FOR_SLAVES=OFF;
+disconnect user1;
+connection default;
+DROP USER user1@localhost;
+#
 # MDEV-21975 Add BINLOG REPLAY privilege and bind new privileges to
 #             gtid_seq_no, preudo_thread_id, server_id, gtid_domain_id
 #

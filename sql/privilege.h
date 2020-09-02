@@ -433,6 +433,9 @@ constexpr privilege_t PRIV_SET_SYSTEM_GLOBAL_VAR_SLOW_LAUNCH_TIME=
 constexpr privilege_t PRIV_SET_SYSTEM_GLOBAL_VAR_THREAD_POOL=
   CONNECTION_ADMIN_ACL | SUPER_ACL;
 
+// Was SUPER_ACL prior to 10.5.5
+constexpr privilege_t PRIV_SET_SYSTEM_VAR_SHUTDOWN_WAIT_FOR_SLAVES=
+  SHUTDOWN_ACL | SUPER_ACL;
 
 /*
   Binary log related privileges that are checked regardless

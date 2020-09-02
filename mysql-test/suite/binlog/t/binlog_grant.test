@@ -173,6 +173,46 @@ connection default;
 DROP USER user1@localhost;
 
 --echo #
+--echo # MENT-731: Setting of SHUTDOWN_WAIT_FOR_SLAVES should require special
+--echo #           privilege, not generic SUPER
+--echo #
+
+--echo # Test that 'shutdown_wait_for_slaves' variable cannot be set without
+--echo # SHUTDOWN or SUPER
+CREATE USER user1@localhost;
+GRANT ALL PRIVILEGES ON *.* TO user1@localhost;
+REVOKE SHUTDOWN, SUPER ON *.* FROM user1@localhost;
+--connect(user1,localhost,user1,,)
+--connection user1
+--error ER_SPECIFIC_ACCESS_DENIED_ERROR
+SET GLOBAL SHUTDOWN_WAIT_FOR_SLAVES=ON;
+--disconnect user1
+--connection default
+DROP USER user1@localhost;
+
+
+--echo # Test that 'shutdown_wait_for_slaves' variable can be set with SHUTDOWN
+CREATE USER user1@localhost;
+GRANT SHUTDOWN ON *.* TO user1@localhost;
+--connect(user1,localhost,user1,,)
+--connection user1
+SET GLOBAL SHUTDOWN_WAIT_FOR_SLAVES=ON;
+--disconnect user1
+connection default;
+DROP USER user1@localhost;
+
+
+--echo # Test that 'shutdown_wait_for_slaves' variable can be set with SUPER
+CREATE USER user1@localhost;
+GRANT SUPER ON *.* TO user1@localhost;
+--connect(user1,localhost,user1,,)
+--connection user1
+SET GLOBAL SHUTDOWN_WAIT_FOR_SLAVES=OFF;
+--disconnect user1
+connection default;
+DROP USER user1@localhost;
+
+--echo #
 --echo # MDEV-21975 Add BINLOG REPLAY privilege and bind new privileges to
 --echo #             gtid_seq_no, preudo_thread_id, server_id, gtid_domain_id
 --echo #

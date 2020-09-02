@@ -4573,7 +4573,10 @@ static Sys_var_ulong Sys_profiling_history_size(
        VALID_RANGE(0, 100), DEFAULT(15), BLOCK_SIZE(1));
 #endif
 
-static Sys_var_mybool Sys_shutdown_wait_for_slaves(
+static Sys_var_on_access_global<Sys_var_mybool,
+                                PRIV_SET_SYSTEM_VAR_SHUTDOWN_WAIT_FOR_SLAVES>
+
+Sys_shutdown_wait_for_slaves(
        "shutdown_wait_for_slaves",
        "when ON, SHUTDOWN command runs with implicit WAIT FOR ALL SLAVES option.",
        GLOBAL_VAR(opt_shutdown_wait_for_slaves), CMD_LINE(OPT_ARG),
