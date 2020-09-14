@@ -64,5 +64,6 @@ connection node_2;
 CALL mtr.add_suppression("inconsistent with group");
 CALL mtr.add_suppression("Failed to send NBO-end");
 CALL mtr.add_suppression("NBO phase two begin failed for:");
+CALL mtr.add_suppression("WSREP: Closing during nonblocking operation. Node will be left in inconsistent state and must be re-initialized either by full SST or from backup.");
 connection node_3;
 CALL mtr.add_suppression("Slave SQL: Error");
