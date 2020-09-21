@@ -6057,6 +6057,7 @@ UNIV_INTERN struct st_maria_plugin	i_s_innodb_sys_fields =
         STRUCT_FLD(maturity, MariaDB_PLUGIN_MATURITY_STABLE),
 };
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 namespace Show {
 /**  SYS_FOREIGN        ********************************************/
 /* Fields of the dynamic table INFORMATION_SCHEMA.INNODB_SYS_FOREIGN */
@@ -6448,6 +6449,7 @@ UNIV_INTERN struct st_maria_plugin	i_s_innodb_sys_foreign_cols =
 	STRUCT_FLD(version_info, INNODB_VERSION_STR),
         STRUCT_FLD(maturity, MariaDB_PLUGIN_MATURITY_STABLE),
 };
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
 namespace Show {
 /**  SYS_TABLESPACES    ********************************************/

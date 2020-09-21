@@ -201,6 +201,7 @@ dict_process_sys_fields_rec(
 	ulint*		pos,		/*!< out: Field position */
 	index_id_t*	index_id,	/*!< out: current index id */
 	index_id_t	last_id);	/*!< in: previous index id */
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 /********************************************************************//**
 This function parses a SYS_FOREIGN record and populate a dict_foreign_t
 structure with the information from the record. For detail information
@@ -227,6 +228,7 @@ dict_process_sys_foreign_col_rec(
 	const char**	ref_col_name,	/*!< out: referenced column name
 					in referenced table */
 	ulint*		pos);		/*!< out: column position */
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 /********************************************************************//**
 This function parses a SYS_TABLESPACES record, extracts necessary
 information from the record and returns to caller.

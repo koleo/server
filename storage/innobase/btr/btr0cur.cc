@@ -1154,6 +1154,7 @@ static ulint btr_node_ptr_max_size(const dict_index_t* index)
 				continue;
 			}
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 			/* SYS_FOREIGN.ID is defined as CHAR in the
 			InnoDB internal SQL parser, which translates
 			into the incorrect VARCHAR(0).  InnoDB does
@@ -1169,6 +1170,7 @@ static ulint btr_node_ptr_max_size(const dict_index_t* index)
 				      "SYS_FOREIGN")
 			      || !strcmp(index->table->name.m_name,
 					 "SYS_FOREIGN_COLS"));
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 			ut_ad(!comp);
 			ut_ad(col->mtype == DATA_VARCHAR);
 

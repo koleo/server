@@ -1929,6 +1929,7 @@ skip_monitors:
 		}
 	}
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 	/* Create the SYS_FOREIGN and SYS_FOREIGN_COLS system tables */
 	err = dict_create_or_check_foreign_constraint_tables();
 	if (err == DB_SUCCESS) {
@@ -1937,6 +1938,12 @@ skip_monitors:
 			err = dict_create_or_check_sys_virtual();
 		}
 	}
+#else
+	err = dict_create_or_check_sys_tablespace();
+	if (err == DB_SUCCESS) {
+		err = dict_create_or_check_sys_virtual();
+	}
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 	switch (err) {
 	case DB_SUCCESS:
 		break;

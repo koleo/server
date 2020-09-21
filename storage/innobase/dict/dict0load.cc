@@ -507,6 +507,7 @@ dict_process_sys_fields_rec(
 
 }
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 /********************************************************************//**
 This function parses a SYS_FOREIGN record and populate a dict_foreign_t
 structure with the information from the record. For detail information
@@ -655,6 +656,7 @@ err_len:
 
 	return(NULL);
 }
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
 /********************************************************************//**
 This function parses a SYS_TABLESPACES record, extracts necessary

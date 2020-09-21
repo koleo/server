@@ -113,6 +113,7 @@ dict_create_index_tree_in_mem(
 	dict_index_t*	index,		/*!< in/out: index */
 	const trx_t*	trx);		/*!< in: InnoDB transaction handle */
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 /****************************************************************//**
 Creates the foreign key constraints system tables inside InnoDB
 at server bootstrap or server start if they are not found or are
@@ -121,6 +122,7 @@ not of the right form.
 dberr_t
 dict_create_or_check_foreign_constraint_tables(void);
 /*================================================*/
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
 /********************************************************************//**
 Generate a foreign key constraint name when it was not named by the user.
@@ -136,6 +138,7 @@ dict_create_add_foreign_id(
 	const char*	name,		/*!< in: table name */
 	dict_foreign_t*	foreign);	/*!< in/out: foreign key */
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 /** Adds the given set of foreign key objects to the dictionary tables
 in the database. This function does not modify the dictionary cache. The
 caller must ensure that all foreign key objects contain a valid constraint
@@ -153,6 +156,7 @@ dict_create_add_foreigns_to_dictionary(
 	const dict_table_t*	table,
 	trx_t*			trx)
 	MY_ATTRIBUTE((nonnull, warn_unused_result));
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
 /** Check if a foreign constraint is on columns server as base columns
 of any stored column. This is to prevent creating SET NULL or CASCADE
@@ -198,6 +202,7 @@ dict_replace_tablespace_in_dictionary(
 	const char*	path,
 	trx_t*		trx);
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 /********************************************************************//**
 Add a foreign key definition to the data dictionary tables.
 @return error code or DB_SUCCESS */
@@ -218,6 +223,7 @@ dict_foreign_def_get(
 /*=================*/
 	dict_foreign_t*	foreign,/*!< in: foreign */
 	trx_t*		trx);	/*!< in: trx */
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
 /* Table create node structure */
 struct tab_node_t{

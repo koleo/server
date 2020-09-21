@@ -1383,6 +1383,7 @@ dict_check_if_system_table_exists(
 	return(error);
 }
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 /****************************************************************//**
 Creates the foreign key constraints system tables inside InnoDB
 at server bootstrap or server start if they are not found or are
@@ -1527,6 +1528,7 @@ dict_create_or_check_foreign_constraint_tables(void)
 
 	return(err);
 }
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
 /** Creates the virtual column system table (SYS_VIRTUAL) inside InnoDB
 at server bootstrap or server start if the table is not found or is
@@ -1628,6 +1630,7 @@ dict_create_or_check_sys_virtual()
 	return(err);
 }
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 /****************************************************************//**
 Evaluate the given foreign key SQL statement.
 @return error code or DB_SUCCESS */
@@ -1925,6 +1928,7 @@ dict_create_add_foreign_to_dictionary(
 
 	DBUG_RETURN(error);
 }
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
 /** Check if a foreign constraint is on the given column name.
 @param[in]	col_name	column name to be searched for fk constraint
@@ -2000,6 +2004,7 @@ dict_foreigns_has_s_base_col(
 	return(false);
 }
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 /** Adds the given set of foreign key objects to the dictionary tables
 in the database. This function does not modify the dictionary cache. The
 caller must ensure that all foreign key objects contain a valid constraint
@@ -2049,6 +2054,7 @@ dict_create_add_foreigns_to_dictionary(
 
 	return error;
 }
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
 /****************************************************************//**
 Creates the tablespaces and datafiles system tables inside InnoDB

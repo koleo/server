@@ -8798,6 +8798,7 @@ func_exit:
 	DBUG_RETURN(fail);
 }
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 /** Drop a FOREIGN KEY constraint from the data dictionary tables.
 @param trx data dictionary transaction
 @param table_name Table name in MySQL
@@ -8846,6 +8847,7 @@ innobase_drop_foreign_try(
 
 	DBUG_RETURN(false);
 }
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
 /** Rename a column in the data dictionary tables.
 @param[in] ctx			ALTER TABLE context
@@ -9496,6 +9498,7 @@ innobase_update_foreign_try(
 				DBUG_RETURN(true);
 			}
 		}
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
 		/* The fk->foreign_col_names[] uses renamed column
 		names, while the columns in ctx->old_table have not
 		been renamed yet. */
@@ -9520,6 +9523,7 @@ innobase_update_foreign_try(
 		if (innobase_drop_foreign_try(trx, table_name, fk->id)) {
 			DBUG_RETURN(true);
 		}
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 	}
 
 	DBUG_RETURN(false);
