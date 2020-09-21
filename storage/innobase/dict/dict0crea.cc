@@ -1628,6 +1628,304 @@ dict_create_or_check_sys_virtual()
 	return(err);
 }
 
+/****************************************************************//**
+Evaluate the given foreign key SQL statement.
+@return error code or DB_SUCCESS */
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
+dberr_t
+dict_foreign_eval_sql(
+/*==================*/
+	pars_info_t*	info,	/*!< in: info struct */
+	const char*	sql,	/*!< in: SQL string to evaluate */
+	const char*	name,	/*!< in: table name (for diagnostics) */
+	const char*	id,	/*!< in: foreign key id */
+	trx_t*		trx)	/*!< in/out: transaction */
+{
+	dberr_t	error;
+	FILE*	ef	= dict_foreign_err_file;
+
+	error = que_eval_sql(info, sql, FALSE, trx);
+
+	if (error == DB_DUPLICATE_KEY) {
+		mutex_enter(&dict_foreign_err_mutex);
+		rewind(ef);
+		ut_print_timestamp(ef);
+		fputs(" Error in foreign key constraint creation for table ",
+		      ef);
+		ut_print_name(ef, trx, name);
+		fputs(".\nA foreign key constraint of name ", ef);
+		ut_print_name(ef, trx, id);
+		fputs("\nalready exists."
+		      " (Note that internally InnoDB adds 'databasename'\n"
+		      "in front of the user-defined constraint name.)\n"
+		      "Note that InnoDB's FOREIGN KEY system tables store\n"
+		      "constraint names as case-insensitive, with the\n"
+		      "MySQL standard latin1_swedish_ci collation. If you\n"
+		      "create tables or databases whose names differ only in\n"
+		      "the character case, then collisions in constraint\n"
+		      "names can occur. Workaround: name your constraints\n"
+		      "explicitly with unique names.\n",
+		      ef);
+
+		mutex_exit(&dict_foreign_err_mutex);
+
+		return(error);
+	}
+
+	if (UNIV_UNLIKELY(error != DB_SUCCESS)) {
+		ib::error() << "Foreign key constraint creation failed: "
+			<< error;
+
+		mutex_enter(&dict_foreign_err_mutex);
+		ut_print_timestamp(ef);
+		fputs(" Internal error in foreign key constraint creation"
+		      " for table ", ef);
+		ut_print_name(ef, trx, name);
+		fputs(".\n"
+		      "See the MySQL .err log in the datadir"
+		      " for more information.\n", ef);
+		mutex_exit(&dict_foreign_err_mutex);
+
+		return(error);
+	}
+
+	return(DB_SUCCESS);
+}
+
+/********************************************************************//**
+Add a single foreign key field definition to the data dictionary tables in
+the database.
+@return error code or DB_SUCCESS */
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
+dberr_t
+dict_create_add_foreign_field_to_dictionary(
+/*========================================*/
+	ulint			field_nr,	/*!< in: field number */
+	const char*		table_name,	/*!< in: table name */
+	const dict_foreign_t*	foreign,	/*!< in: foreign */
+	trx_t*			trx)		/*!< in/out: transaction */
+{
+	DBUG_ENTER("dict_create_add_foreign_field_to_dictionary");
+
+	pars_info_t*	info = pars_info_create();
+
+	pars_info_add_str_literal(info, "id", foreign->id);
+
+	pars_info_add_int4_literal(info, "pos", field_nr);
+
+	pars_info_add_str_literal(info, "for_col_name",
+				  foreign->foreign_col_names[field_nr]);
+
+	pars_info_add_str_literal(info, "ref_col_name",
+				  foreign->referenced_col_names[field_nr]);
+
+	DBUG_RETURN(dict_foreign_eval_sql(
+		       info,
+		       "PROCEDURE P () IS\n"
+		       "BEGIN\n"
+		       "INSERT INTO SYS_FOREIGN_COLS VALUES"
+		       "(:id, :pos, :for_col_name, :ref_col_name);\n"
+		       "END;\n",
+		       table_name, foreign->id, trx));
+}
+
+/********************************************************************//**
+Construct foreign key constraint defintion from data dictionary information.
+*/
+UNIV_INTERN
+char*
+dict_foreign_def_get(
+/*=================*/
+	dict_foreign_t*	foreign,/*!< in: foreign */
+	trx_t*		trx)	/*!< in: trx */
+{
+	char* fk_def = (char *)mem_heap_alloc(foreign->heap, 4*1024);
+	const char* tbname;
+	char tablebuf[MAX_TABLE_NAME_LEN + 1] = "";
+	unsigned i;
+	char* bufend;
+
+	tbname = dict_remove_db_name(foreign->id);
+	bufend = innobase_convert_name(tablebuf, MAX_TABLE_NAME_LEN,
+				tbname, strlen(tbname), trx->mysql_thd);
+	tablebuf[bufend - tablebuf] = '\0';
+
+	sprintf(fk_def,
+		(char *)"CONSTRAINT %s FOREIGN KEY (", (char *)tablebuf);
+
+	for(i = 0; i < foreign->n_fields; i++) {
+		char	buf[MAX_TABLE_NAME_LEN + 1] = "";
+		innobase_convert_name(buf, MAX_TABLE_NAME_LEN,
+				foreign->foreign_col_names[i],
+				strlen(foreign->foreign_col_names[i]),
+				trx->mysql_thd);
+		strcat(fk_def, buf);
+		if (i < static_cast<unsigned>(foreign->n_fields-1)) {
+			strcat(fk_def, (char *)",");
+		}
+	}
+
+	strcat(fk_def,(char *)") REFERENCES ");
+
+	bufend = innobase_convert_name(tablebuf, MAX_TABLE_NAME_LEN,
+	        	        foreign->referenced_table_name,
+			        strlen(foreign->referenced_table_name),
+			        trx->mysql_thd);
+	tablebuf[bufend - tablebuf] = '\0';
+
+	strcat(fk_def, tablebuf);
+	strcat(fk_def, " (");
+
+	for(i = 0; i < foreign->n_fields; i++) {
+		char	buf[MAX_TABLE_NAME_LEN + 1] = "";
+		bufend = innobase_convert_name(buf, MAX_TABLE_NAME_LEN,
+				foreign->referenced_col_names[i],
+				strlen(foreign->referenced_col_names[i]),
+				trx->mysql_thd);
+		buf[bufend - buf] = '\0';
+		strcat(fk_def, buf);
+		if (i < (uint)foreign->n_fields-1) {
+			strcat(fk_def, (char *)",");
+		}
+	}
+	strcat(fk_def, (char *)")");
+
+	return fk_def;
+}
+
+/********************************************************************//**
+Convert foreign key column names from data dictionary to SQL-layer.
+*/
+static
+void
+dict_foreign_def_get_fields(
+/*========================*/
+	dict_foreign_t*	foreign,/*!< in: foreign */
+	trx_t*		trx,	/*!< in: trx */
+	char**		field,  /*!< out: foreign column */
+	char**		field2, /*!< out: referenced column */
+	ulint		col_no) /*!< in: column number */
+{
+	char* bufend;
+	char* fieldbuf = (char *)mem_heap_alloc(foreign->heap, MAX_TABLE_NAME_LEN+1);
+	char* fieldbuf2 = (char *)mem_heap_alloc(foreign->heap, MAX_TABLE_NAME_LEN+1);
+
+	bufend = innobase_convert_name(fieldbuf, MAX_TABLE_NAME_LEN,
+			foreign->foreign_col_names[col_no],
+			strlen(foreign->foreign_col_names[col_no]),
+			trx->mysql_thd);
+
+	fieldbuf[bufend - fieldbuf] = '\0';
+
+	bufend = innobase_convert_name(fieldbuf2, MAX_TABLE_NAME_LEN,
+			foreign->referenced_col_names[col_no],
+			strlen(foreign->referenced_col_names[col_no]),
+			trx->mysql_thd);
+
+	fieldbuf2[bufend - fieldbuf2] = '\0';
+	*field = fieldbuf;
+	*field2 = fieldbuf2;
+}
+
+/********************************************************************//**
+Add a foreign key definition to the data dictionary tables.
+@return error code or DB_SUCCESS */
+dberr_t
+dict_create_add_foreign_to_dictionary(
+/*==================================*/
+	const char*		name,	/*!< in: table name */
+	const dict_foreign_t*	foreign,/*!< in: foreign key */
+	trx_t*			trx)	/*!< in/out: dictionary transaction */
+{
+	dberr_t		error;
+
+	DBUG_ENTER("dict_create_add_foreign_to_dictionary");
+
+	pars_info_t*	info = pars_info_create();
+
+	pars_info_add_str_literal(info, "id", foreign->id);
+
+	pars_info_add_str_literal(info, "for_name", name);
+
+	pars_info_add_str_literal(info, "ref_name",
+				  foreign->referenced_table_name);
+
+	pars_info_add_int4_literal(info, "n_cols",
+				   ulint(foreign->n_fields)
+				   | (ulint(foreign->type) << 24));
+
+	DBUG_PRINT("dict_create_add_foreign_to_dictionary",
+		   ("'%s', '%s', '%s', %d", foreign->id, name,
+		    foreign->referenced_table_name,
+		    foreign->n_fields + (foreign->type << 24)));
+
+	error = dict_foreign_eval_sql(info,
+				      "PROCEDURE P () IS\n"
+				      "BEGIN\n"
+				      "INSERT INTO SYS_FOREIGN VALUES"
+				      "(:id, :for_name, :ref_name, :n_cols);\n"
+				      "END;\n"
+				      , name, foreign->id, trx);
+
+	if (error != DB_SUCCESS) {
+
+		if (error == DB_DUPLICATE_KEY) {
+			char	buf[MAX_TABLE_NAME_LEN + 1] = "";
+			char	tablename[MAX_TABLE_NAME_LEN + 1] = "";
+			char*	fk_def;
+
+			innobase_convert_name(tablename, MAX_TABLE_NAME_LEN,
+				name, strlen(name), trx->mysql_thd);
+
+			innobase_convert_name(buf, MAX_TABLE_NAME_LEN,
+				foreign->id, strlen(foreign->id), trx->mysql_thd);
+
+			fk_def = dict_foreign_def_get((dict_foreign_t*)foreign, trx);
+
+			ib_push_warning(trx, error,
+				"Create or Alter table %s with foreign key constraint"
+				" failed. Foreign key constraint %s"
+				" already exists on data dictionary."
+				" Foreign key constraint names need to be unique in database."
+				" Error in foreign key definition: %s.",
+				tablename, buf, fk_def);
+		}
+
+		DBUG_RETURN(error);
+	}
+
+	for (ulint i = 0; i < foreign->n_fields; i++) {
+		error = dict_create_add_foreign_field_to_dictionary(
+			i, name, foreign, trx);
+
+		if (error != DB_SUCCESS) {
+			char	buf[MAX_TABLE_NAME_LEN + 1] = "";
+			char	tablename[MAX_TABLE_NAME_LEN + 1] = "";
+			char*	field=NULL;
+			char*	field2=NULL;
+			char*	fk_def;
+
+			innobase_convert_name(tablename, MAX_TABLE_NAME_LEN,
+				name, strlen(name), trx->mysql_thd);
+			innobase_convert_name(buf, MAX_TABLE_NAME_LEN,
+				foreign->id, strlen(foreign->id), trx->mysql_thd);
+			fk_def = dict_foreign_def_get((dict_foreign_t*)foreign, trx);
+			dict_foreign_def_get_fields((dict_foreign_t*)foreign, trx, &field, &field2, i);
+
+			ib_push_warning(trx, error,
+				"Create or Alter table %s with foreign key constraint"
+				" failed. Error adding foreign  key constraint name %s"
+				" fields %s or %s to the dictionary."
+				" Error in foreign key definition: %s.",
+				tablename, buf, i+1, fk_def);
+
+			DBUG_RETURN(error);
+		}
+	}
+
+	DBUG_RETURN(error);
+}
+
 /** Check if a foreign constraint is on the given column name.
 @param[in]	col_name	column name to be searched for fk constraint
 @param[in]	table		table to which foreign key constraint belongs
@@ -1700,6 +1998,56 @@ dict_foreigns_has_s_base_col(
 	}
 
 	return(false);
+}
+
+/** Adds the given set of foreign key objects to the dictionary tables
+in the database. This function does not modify the dictionary cache. The
+caller must ensure that all foreign key objects contain a valid constraint
+name in foreign->id.
+@param[in]	local_fk_set	set of foreign key objects, to be added to
+the dictionary tables
+@param[in]	table		table to which the foreign key objects in
+local_fk_set belong to
+@param[in,out]	trx		transaction
+@return error code or DB_SUCCESS */
+dberr_t
+dict_create_add_foreigns_to_dictionary(
+/*===================================*/
+	const dict_foreign_set&	local_fk_set,
+	const dict_table_t*	table,
+	trx_t*			trx)
+{
+	dict_foreign_t*	foreign;
+	dberr_t		error;
+
+	ut_ad(mutex_own(&dict_sys.mutex));
+
+	if (NULL == dict_table_get_low("SYS_FOREIGN")) {
+
+		ib::error() << "Table SYS_FOREIGN not found"
+			" in internal data dictionary";
+
+		return(DB_ERROR);
+	}
+
+	error = DB_SUCCESS;
+
+	for (dict_foreign_set::const_iterator it = local_fk_set.begin();
+	     it != local_fk_set.end();
+	     ++it) {
+
+		foreign = *it;
+		ut_ad(foreign->id != NULL);
+
+		error = dict_create_add_foreign_to_dictionary(
+			table->name.m_name, foreign, trx);
+
+		if (error != DB_SUCCESS) {
+			break;
+		}
+	}
+
+	return error;
 }
 
 /****************************************************************//**

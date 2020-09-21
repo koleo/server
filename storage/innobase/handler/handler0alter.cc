@@ -8798,6 +8798,55 @@ func_exit:
 	DBUG_RETURN(fail);
 }
 
+/** Drop a FOREIGN KEY constraint from the data dictionary tables.
+@param trx data dictionary transaction
+@param table_name Table name in MySQL
+@param foreign_id Foreign key constraint identifier
+@retval true Failure
+@retval false Success */
+static MY_ATTRIBUTE((nonnull, warn_unused_result))
+bool
+innobase_drop_foreign_try(
+/*======================*/
+	trx_t*			trx,
+	const char*		table_name,
+	const char*		foreign_id)
+{
+	DBUG_ENTER("innobase_drop_foreign_try");
+
+	DBUG_ASSERT(trx_get_dict_operation(trx) == TRX_DICT_OP_INDEX);
+	ut_ad(trx->dict_operation_lock_mode == RW_X_LATCH);
+	ut_d(dict_sys.assert_locked());
+
+	/* Drop the constraint from the data dictionary. */
+	static const char sql[] =
+		"PROCEDURE DROP_FOREIGN_PROC () IS\n"
+		"BEGIN\n"
+		"DELETE FROM SYS_FOREIGN WHERE ID=:id;\n"
+		"DELETE FROM SYS_FOREIGN_COLS WHERE ID=:id;\n"
+		"END;\n";
+
+	dberr_t		error;
+	pars_info_t*	info;
+
+	info = pars_info_create();
+	pars_info_add_str_literal(info, "id", foreign_id);
+
+	trx->op_info = "dropping foreign key constraint from dictionary";
+	error = que_eval_sql(info, sql, FALSE, trx);
+	trx->op_info = "";
+
+	if (error != DB_SUCCESS) {
+		/*
+		   NB: now we don't fail innobase_drop_foreign_try() as
+		   deprecated SYS_FOREIGN(_COLS) may have no data.
+		*/
+		trx->error_state = DB_SUCCESS;
+	}
+
+	DBUG_RETURN(false);
+}
+
 /** Rename a column in the data dictionary tables.
 @param[in] ctx			ALTER TABLE context
 @param[in,out] trx		Data dictionary transaction
@@ -9446,6 +9495,30 @@ innobase_update_foreign_try(
 					 MYF(0), table_name, fk->id);
 				DBUG_RETURN(true);
 			}
+		}
+		/* The fk->foreign_col_names[] uses renamed column
+		names, while the columns in ctx->old_table have not
+		been renamed yet. */
+		error = dict_create_add_foreign_to_dictionary(
+			ctx->old_table->name.m_name, fk, trx);
+
+		DBUG_EXECUTE_IF(
+			"innodb_test_cannot_add_fk_system",
+			error = DB_ERROR;);
+
+		if (error != DB_SUCCESS) {
+			my_error_innodb(error, table_name, 0);
+			DBUG_RETURN(true);
+		}
+	}
+
+	for (i = 0; i < ctx->num_to_drop_fk; i++) {
+		dict_foreign_t* fk = ctx->drop_fk[i];
+
+		DBUG_ASSERT(fk->foreign_table == ctx->old_table);
+
+		if (innobase_drop_foreign_try(trx, table_name, fk->id)) {
+			DBUG_RETURN(true);
 		}
 	}
 

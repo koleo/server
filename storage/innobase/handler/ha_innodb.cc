@@ -12143,11 +12143,19 @@ create_table_info_t::create_foreign_keys()
 		}
 	}
 
+	/**********************************************************/
+	/* The following call adds the foreign key constraints
+	to the data dictionary system tables on disk */
+	m_trx->op_info = "adding foreign keys";
+	trx_start_if_not_started_xa(m_trx, true);
+	trx_set_dict_operation(m_trx, TRX_DICT_OP_TABLE);
+	dberr_t error = dict_create_add_foreigns_to_dictionary(local_fk_set, table, m_trx);
+
 	local_fk_set.clear();
 
 	dict_mem_table_fill_foreign_vcol_set(table);
 
-	return (DB_SUCCESS);
+	return (error);
 }
 
 /** Create the internal innodb table.
