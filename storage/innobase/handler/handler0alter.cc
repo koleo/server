@@ -9499,29 +9499,33 @@ innobase_update_foreign_try(
 			}
 		}
 #ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
-		/* The fk->foreign_col_names[] uses renamed column
-		names, while the columns in ctx->old_table have not
-		been renamed yet. */
-		error = dict_create_add_foreign_to_dictionary(
-			ctx->old_table->name.m_name, fk, trx);
+		if (innodb_shadow_foreign_storage) {
+			/* The fk->foreign_col_names[] uses renamed column
+			names, while the columns in ctx->old_table have not
+			been renamed yet. */
+			error = dict_create_add_foreign_to_dictionary(
+				ctx->old_table->name.m_name, fk, trx);
 
-		DBUG_EXECUTE_IF(
-			"innodb_test_cannot_add_fk_system",
-			error = DB_ERROR;);
+			DBUG_EXECUTE_IF(
+				"innodb_test_cannot_add_fk_system",
+				error = DB_ERROR;);
 
-		if (error != DB_SUCCESS) {
-			my_error_innodb(error, table_name, 0);
-			DBUG_RETURN(true);
+			if (error != DB_SUCCESS) {
+				my_error_innodb(error, table_name, 0);
+				DBUG_RETURN(true);
+			}
 		}
 	}
 
-	for (i = 0; i < ctx->num_to_drop_fk; i++) {
-		dict_foreign_t* fk = ctx->drop_fk[i];
+	if (innodb_shadow_foreign_storage) {
+		for (i = 0; i < ctx->num_to_drop_fk; i++) {
+			dict_foreign_t* fk = ctx->drop_fk[i];
 
-		DBUG_ASSERT(fk->foreign_table == ctx->old_table);
+			DBUG_ASSERT(fk->foreign_table == ctx->old_table);
 
-		if (innobase_drop_foreign_try(trx, table_name, fk->id)) {
-			DBUG_RETURN(true);
+			if (innobase_drop_foreign_try(trx, table_name, fk->id)) {
+				DBUG_RETURN(true);
+			}
 		}
 #endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 	}

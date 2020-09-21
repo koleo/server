@@ -12144,13 +12144,14 @@ create_table_info_t::create_foreign_keys()
 	}
 
 #ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
-	/**********************************************************/
-	/* The following call adds the foreign key constraints
-	to the data dictionary system tables on disk */
-	m_trx->op_info = "adding foreign keys";
-	trx_start_if_not_started_xa(m_trx, true);
-	trx_set_dict_operation(m_trx, TRX_DICT_OP_TABLE);
-	dberr_t error = dict_create_add_foreigns_to_dictionary(local_fk_set, table, m_trx);
+	dberr_t error = DB_SUCCESS;
+	if (innodb_shadow_foreign_storage) {
+		m_trx->op_info = "adding foreign keys";
+		trx_start_if_not_started_xa(m_trx, true);
+		trx_set_dict_operation(m_trx, TRX_DICT_OP_TABLE);
+		error = dict_create_add_foreigns_to_dictionary(local_fk_set,
+							       table, m_trx);
+	}
 #endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 	local_fk_set.clear();
 
@@ -19392,6 +19393,14 @@ static MYSQL_SYSVAR_BOOL(encrypt_temporary_tables, innodb_encrypt_temporary_tabl
   "Enrypt the temporary table data.",
   NULL, NULL, false);
 
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
+static MYSQL_SYSVAR_BOOL(innodb_shadow_foreign_storage,
+  innodb_shadow_foreign_storage,
+  PLUGIN_VAR_OPCMDARG,
+  "Update SYS_FOREIGN, SYS_FOREIGN_COLS when table foreign keys are updated",
+  NULL, NULL, FALSE);
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
+
 static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(autoextend_increment),
   MYSQL_SYSVAR(buffer_pool_size),
@@ -19571,6 +19580,9 @@ static struct st_mysql_sys_var* innobase_system_variables[]= {
   MYSQL_SYSVAR(buf_dump_status_frequency),
   MYSQL_SYSVAR(background_thread),
   MYSQL_SYSVAR(encrypt_temporary_tables),
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
+  MYSQL_SYSVAR(innodb_shadow_foreign_storage),
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 
   NULL
 };

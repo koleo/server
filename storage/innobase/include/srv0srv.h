@@ -424,6 +424,9 @@ extern ulong	srv_max_purge_lag_delay;
 extern my_bool	innodb_encrypt_temporary_tables;
 
 extern my_bool  srv_immediate_scrub_data_uncompressed;
+#ifdef WITH_INNODB_LEGACY_FOREIGN_STORAGE
+extern my_bool	innodb_shadow_foreign_storage;
+#endif /* WITH_INNODB_LEGACY_FOREIGN_STORAGE */
 /*-------------------------------------------*/
 
 /** Modes of operation */
