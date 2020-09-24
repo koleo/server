@@ -2526,9 +2526,12 @@ int multi_update::send_data(List<Item> &not_used_values)
           */
           main_table->file->extra(HA_EXTRA_PREPARE_FOR_UPDATE);
         }
-        if (unlikely((error=table->file->ha_update_row(table->record[1],
-                                                       table->record[0]))) &&
-            error != HA_ERR_RECORD_IS_THE_SAME)
+
+        uint saved_status= table->status;
+        error=table->file->ha_update_row(table->record[1], table->record[0]);
+        table->status= saved_status;
+
+        if (unlikely(error) && error != HA_ERR_RECORD_IS_THE_SAME)
         {
           updated--;
           if (!ignore ||
