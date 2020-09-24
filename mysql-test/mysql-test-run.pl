@@ -536,7 +536,7 @@ sub main {
   # Send Ctrl-C to any children still running
   kill("INT", keys(%children));
 
-  if (!IS_WINDOWS) { 
+  if (!IS_WINDOWS) {
     # Wait for children to exit
     foreach my $pid (keys %children)
     {
@@ -1324,10 +1324,10 @@ sub command_line_setup {
     $basedir= dirname($basedir);
   }
 
-  # Respect MTR_BINDIR variable, which is typically set in to the 
+  # Respect MTR_BINDIR variable, which is typically set in to the
   # build directory in out-of-source builds.
   $bindir=$ENV{MTR_BINDIR}||$basedir;
-  
+
   fix_vs_config_dir();
 
   # Look for the client binaries directory
@@ -1378,7 +1378,7 @@ sub command_line_setup {
       mtr_report("Using experimental file: $exp_file");
       while(<FILE>) {
 	chomp;
-	# remove comments (# foo) at the beginning of the line, or after a 
+	# remove comments (# foo) at the beginning of the line, or after a
 	# blank at the end of the line
 	s/(\s+|^)#.*$//;
 	# If @ platform specifier given, use this entry only if it contains
@@ -1507,8 +1507,8 @@ sub command_line_setup {
   # --------------------------------------------------------------------------
   # Set the "var/" directory, the base for everything else
   # --------------------------------------------------------------------------
-  my $vardir_location= (defined $ENV{MTR_BINDIR} 
-                          ? "$ENV{MTR_BINDIR}/mysql-test" 
+  my $vardir_location= (defined $ENV{MTR_BINDIR}
+                          ? "$ENV{MTR_BINDIR}/mysql-test"
                           : $glob_mysql_test_dir);
   $vardir_location= realpath $vardir_location;
   $default_vardir= "$vardir_location/var";
@@ -1618,8 +1618,8 @@ sub command_line_setup {
       $opt_debugger= undef;
     }
 
-    if ( $opt_gdb || $opt_ddd || $opt_manual_gdb || $opt_manual_lldb || 
-         $opt_manual_ddd || $opt_manual_debug || $opt_debugger || $opt_dbx || 
+    if ( $opt_gdb || $opt_ddd || $opt_manual_gdb || $opt_manual_lldb ||
+         $opt_manual_ddd || $opt_manual_debug || $opt_debugger || $opt_dbx ||
          $opt_manual_dbx)
     {
       mtr_error("You need to use the client debug options for the",
@@ -2238,7 +2238,7 @@ sub environment_setup {
       if ($^O eq "darwin")
       {
         # it is MAC OS and we have to add dynamic libraries paths
-        push @ld_library_paths, grep {<$_/*.dylib>} 
+        push @ld_library_paths, grep {<$_/*.dylib>}
           (<$bindir/storage/*/.libs/>,<$bindir/plugin/*/.libs/>,
           <$bindir/plugin/*/*/.libs/>,<$bindir/storage/*/*/.libs>);
       }
@@ -2319,7 +2319,7 @@ sub environment_setup {
   $ENV{'MYSQL_BINDIR'}=       $bindir;
   $ENV{'MYSQL_SHAREDIR'}=     $path_language;
   $ENV{'MYSQL_CHARSETSDIR'}=  $path_charsetsdir;
-  
+
   if (IS_WINDOWS)
   {
     $ENV{'SECURE_LOAD_PATH'}= $glob_mysql_test_dir."\\std_data";
@@ -2674,7 +2674,8 @@ sub setup_vardir() {
           for (<$bindir/storage/*$opt_vs_config/*.dll>,
                <$bindir/plugin/*$opt_vs_config/*.dll>,
                <$bindir/libmariadb$opt_vs_config/*.dll>,
-               <$bindir/sql$opt_vs_config/*.dll>)
+               <$bindir/sql$opt_vs_config/*.dll>,
+               <$bindir/lib/plugin/*.dll>)
           {
             my $pname=basename($_);
             copy rel2abs($_), "$plugindir/$pname";
@@ -2954,7 +2955,7 @@ sub mysql_server_start($) {
 
   # Run <tname>-master.sh
   if ($mysqld->option('#!run-master-sh') and
-      defined $tinfo->{master_sh} and 
+      defined $tinfo->{master_sh} and
       run_system('/bin/sh ' . $tinfo->{master_sh}) )
   {
     $tinfo->{'comment'}= "Failed to execute '$tinfo->{master_sh}'";
@@ -3285,7 +3286,7 @@ sub mysql_install_db {
 
   # Extra options can come not only from the command line, but also
   # from option files or combinations. We want them on a command line
-  # that is executed now, because otherwise the datadir might be 
+  # that is executed now, because otherwise the datadir might be
   # incompatible with the test settings, but not on the general
   # $MYSQLD_BOOTSTRAP_CMD line
   foreach my $extra_opt ( @$extra_opts ) {
@@ -4455,7 +4456,7 @@ sub pre_write_errorlog {
 
 sub extract_server_log ($$) {
   my ($error_log, $tname) = @_;
-  
+
   return unless $error_log;
 
   # Open the servers .err log file and read all lines
@@ -6315,7 +6316,7 @@ sub usage ($) {
   {
     print STDERR "$message\n";
     print STDERR "For full list of options, use $0 --help\n";
-    exit;      
+    exit;
   }
 
   local $"= ','; # for @DEFAULT_SUITES below
@@ -6407,7 +6408,7 @@ Options to control what test suites or cases to run
   print-testcases       Don't run the tests but print details about all the
                         selected tests, in the order they would be run.
   skip-test-list=FILE   Skip the tests listed in FILE. Each line in the file
-                        is an entry and should be formatted as: 
+                        is an entry and should be formatted as:
                         <TESTNAME> : <COMMENT>
   force-restart         Always restart servers between tests. This makes it
                         easier to see from which test warnings may come from.
@@ -6471,7 +6472,7 @@ Options for debugging the product
                         test(s)
   manual-dbx            Let user manually start mysqld in dbx, before running
                         test(s)
-  manual-lldb           Let user manually start mysqld in lldb, before running 
+  manual-lldb           Let user manually start mysqld in lldb, before running
                         test(s)
   max-save-core         Limit the number of core files saved (to avoid filling
                         up disks for heavily crashing server). Defaults to
