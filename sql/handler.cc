@@ -3065,7 +3065,7 @@ int handler::ha_close(void)
   tracker= NULL;
   /* We use ref as way to check that open succeded */
   ref= 0;
-  
+
   DBUG_ASSERT(m_lock_type == F_UNLCK);
   DBUG_ASSERT(inited == NONE);
   DBUG_RETURN(close());
@@ -6658,7 +6658,6 @@ int handler::binlog_log_row(TABLE *table,
                             const uchar *after_record,
                             Log_func *log_func)
 {
-  bool error;
   THD *thd= table->in_use;
   DBUG_ENTER("binlog_log_row");
 
@@ -6666,8 +6665,16 @@ int handler::binlog_log_row(TABLE *table,
       thd->binlog_write_table_maps())
     DBUG_RETURN(HA_ERR_RBR_LOGGING_FAILED);
 
-  error= (*log_func)(thd, table, row_logging_has_trans,
-                     before_record, after_record);
+  DBUG_ASSERT(thd->is_current_stmt_binlog_format_row());
+  DBUG_ASSERT((WSREP_NNULL(thd) && wsrep_emulate_bin_log)
+              || mysql_bin_log.is_open());
+
+  auto *cache_mngr= thd->binlog_setup_trx_data();
+  if (cache_mngr == NULL)
+    DBUG_RETURN(HA_ERR_OUT_OF_MEM);
+
+  bool error= (*log_func)(thd, table, &mysql_bin_log, cache_mngr,
+                          row_logging_has_trans, before_record, after_record);
   DBUG_RETURN(error ? HA_ERR_RBR_LOGGING_FAILED : 0);
 }
 
