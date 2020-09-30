@@ -4698,8 +4698,7 @@ public:
   bool check_table_binlog_row_based();
   bool prepare_for_row_logging();
   int prepare_for_insert(bool do_create);
-  int binlog_log_row(TABLE *table,
-                     const uchar *before_record,
+  int binlog_log_row(const uchar *before_record,
                      const uchar *after_record,
                      Log_func *log_func);
 

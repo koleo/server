@@ -6657,9 +6657,6 @@ static int binlog_log_row_online_alter(TABLE* table,
                                        Log_func *log_func,
                                        bool has_trans)
 {
-  if (!table->s->online_alter_binlog)
-    return 0;
-
   THD *thd= table->in_use;
 
   if (!table->online_alter_cache)
@@ -6726,22 +6723,20 @@ static int binlog_log_row_to_binlog(TABLE* table,
     error= (*log_func)(thd, table, &mysql_bin_log, cache, has_trans,
                        before_record, after_record);
 
-  return error ? HA_ERR_RBR_LOGGING_FAILED : 0;
+  DBUG_RETURN(error ? HA_ERR_RBR_LOGGING_FAILED : 0);
 }
 
-int handler::binlog_log_row(TABLE *table,
-                            const uchar *before_record,
+int handler::binlog_log_row(const uchar *before_record,
                             const uchar *after_record,
                             Log_func *log_func)
 {
   DBUG_ENTER("handler::binlog_log_row");
 
-
   int error = 0;
-  if (table->file->check_table_binlog_row_based())
+  if (row_logging)
     error= binlog_log_row_to_binlog(table, before_record, after_record,
                                     log_func, row_logging_has_trans);
-  if (!error)
+  if (!error && table->s->online_alter_binlog)
     error= binlog_log_row_online_alter(table, before_record, after_record,
                                        log_func, row_logging_has_trans);
   DBUG_RETURN(error);
@@ -7274,11 +7269,9 @@ int handler::ha_write_row(const uchar *buf)
   if (likely(!error))
   {
     rows_changed++;
-    if (row_logging)
-    {
-      Log_func *log_func= Write_rows_log_event::binlog_row_logging_function;
-      error= binlog_log_row(table, 0, buf, log_func);
-    }
+    Log_func *log_func= Write_rows_log_event::binlog_row_logging_function;
+    error= binlog_log_row(0, buf, log_func);
+
 #ifdef WITH_WSREP
     if (WSREP_NNULL(ha_thd()) && table_share->tmp_table == NO_TMP_TABLE &&
         ht->flags & HTON_WSREP_REPLICATION &&
@@ -7325,11 +7318,9 @@ int handler::ha_update_row(const uchar *old_data, const uchar *new_data)
   if (likely(!error))
   {
     rows_changed++;
-    if (row_logging)
-    {
-      Log_func *log_func= Update_rows_log_event::binlog_row_logging_function;
-      error= binlog_log_row(table, old_data, new_data, log_func);
-    }
+    Log_func *log_func= Update_rows_log_event::binlog_row_logging_function;
+    error= binlog_log_row(old_data, new_data, log_func);
+
 #ifdef WITH_WSREP
     if (WSREP_NNULL(ha_thd()) && table_share->tmp_table == NO_TMP_TABLE &&
         ht->flags & HTON_WSREP_REPLICATION &&
@@ -7389,11 +7380,9 @@ int handler::ha_delete_row(const uchar *buf)
   if (likely(!error))
   {
     rows_changed++;
-    if (row_logging)
-    {
-      Log_func *log_func= Delete_rows_log_event::binlog_row_logging_function;
-      error= binlog_log_row(table, buf, 0, log_func);
-    }
+    Log_func *log_func= Delete_rows_log_event::binlog_row_logging_function;
+    error= binlog_log_row(buf, 0, log_func);
+
 #ifdef WITH_WSREP
     if (WSREP_NNULL(ha_thd()) && table_share->tmp_table == NO_TMP_TABLE &&
         ht->flags & HTON_WSREP_REPLICATION &&
