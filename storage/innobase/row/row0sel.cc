@@ -3900,7 +3900,7 @@ exhausted:
 
 /*********************************************************************//**
 Check a pushed-down index condition.
-@return CHECK_NEG, CHECK_POS, or CHECK_OUT_OF_RANGE */
+@return CHECK_ABORTED_BY_USER, CHECK_NEG, CHECK_POS, or CHECK_OUT_OF_RANGE */
 static
 check_result_t
 row_search_idx_cond_check(
@@ -3986,7 +3986,7 @@ row_search_idx_cond_check(
                         case CHECK_POS:
                                 break;
                         default:
-                                ut_error;
+                                return(result);
                         }
 		}
 		/* Convert the remaining fields to MySQL format.
